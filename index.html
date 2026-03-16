@@ -7,9 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0e14; --card: #131920; --card2: #1a2130; --text: #dce8f5; --dim: #6b7a8d;
+    --bg: #0a0e14; --card: #131920; --card2: #1a2130; --text: #dce8f5; --dim: #94a3b8;
     --accent: #4fa3e0; --mono: 'JetBrains Mono', monospace; --sans: 'DM Sans', sans-serif;
-    --border: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.07);
     --score-none:  #4a5568;
     --score-low:   #718096;
     --score-mid:   #c4aa4a;
@@ -90,11 +90,11 @@
   .peaks-block { padding: 9px 13px; border-bottom: 1px solid var(--border); }
   .peak-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
   .peak-row-name { font-size: 11px; font-family: var(--mono); color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .peak-row-elev { font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.18); width: 58px; text-align: right; flex-shrink: 0; }
+  .peak-row-elev { font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.38); width: 58px; text-align: right; flex-shrink: 0; }
   .peak-row-status { font-size: 10px; font-family: var(--mono); font-weight: 600; width: 72px; text-align: right; flex-shrink: 0; white-space: nowrap; }
   .peak-row-status.above { color: var(--above); }
   .peak-row-status.edge  { color: var(--edge); }
-  .peak-row-status.below { color: var(--below); }
+  .peak-row-status.below { color: #5a7a8a; }
 
   /* Conditions metrics */
   .cond-block { padding: 8px 13px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
@@ -105,19 +105,49 @@
   .ok    { color: var(--edge); }
   .poor  { color: var(--dim); }
 
-  /* Sub-score breakdown bar */
-  .subscore-block { padding: 6px 13px 10px; border-top: 1px solid rgba(255,255,255,0.03); display: flex; gap: 3px; align-items: flex-end; height: 28px; }
-  .subscore-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
+  /* Sub-score breakdown bars — fixed-height tracks, fill = earned/max */
+  .subscore-section { padding: 4px 13px 8px; border-top: 1px solid rgba(255,255,255,0.03); }
+  .subscore-row { display: flex; gap: 5px; align-items: flex-end; height: 36px; }
+  .subscore-track { flex: 1; background: rgba(255,255,255,0.05); border-radius: 2px 2px 0 0; position: relative; height: 32px; }
+  .subscore-fill  { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 2px 2px 0 0; transition: height 0.5s ease; }
+  .subscore-labels { display: flex; gap: 5px; margin-top: 3px; }
+  .subscore-lbl { flex: 1; text-align: center; font-size: 7px; font-family: var(--mono); color: rgba(255,255,255,0.22); text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.3; }
+
+  /* Dual score display */
+  .dual-score { display: flex; gap: 10px; align-items: stretch; padding: 12px 13px 10px; border-bottom: 1px solid var(--border); }
+  .dual-score-primary { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .dual-score-secondary { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; border-left: 1px solid rgba(255,255,255,0.06); padding-left: 10px; min-width: 72px; }
+  .dscore-num-big { font-size: 48px; font-weight: 700; font-family: var(--mono); line-height: 1; letter-spacing: -0.05em; flex-shrink: 0; }
+  .dscore-num-sm  { font-size: 22px; font-weight: 700; font-family: var(--mono); line-height: 1; letter-spacing: -0.03em; }
+  .dscore-tag { font-size: 8px; font-family: var(--mono); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px; }
+  .dscore-label { font-size: 11px; font-family: var(--mono); letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+  .dscore-detail { font-size: 9px; font-family: var(--mono); color: var(--dim); margin-top: 3px; line-height: 1.5; }
+  .dscore-bar-track { height: 2px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .dscore-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
 
   /* Hourly detail */
   .hourly-expand { border-top: 1px solid rgba(79,163,224,0.15); }
-  .hourly-expand-head { display: grid; grid-template-columns: 56px 46px 52px 62px 42px 50px; padding: 5px 13px 3px; font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.18); text-transform: uppercase; letter-spacing: 0.05em; }
-  .h-row { display: grid; grid-template-columns: 56px 46px 52px 62px 42px 50px; padding: 4px 13px; font-size: 10px; font-family: var(--mono); border-left: 2px solid transparent; }
+  .hourly-expand-head { display: grid; grid-template-columns: 58px 40px 40px 32px 42px 52px; padding: 5px 13px 3px; font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.18); text-transform: uppercase; letter-spacing: 0.05em; }
+  .h-row { display: grid; grid-template-columns: 58px 40px 40px 32px 42px 52px; padding: 4px 13px; font-size: 10px; font-family: var(--mono); border-left: 2px solid transparent; }
   .h-row.is-sunrise { border-left-color: #c4aa4a; background: rgba(196,170,74,0.04); }
   .h-row.is-golden  { background: rgba(196,170,74,0.02); }
-  .inv-badge { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 8px; letter-spacing: 0.04em; }
 
-  /* Modal */
+  /* Score breakdown panel */
+  .breakdown-panel { border-top: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); padding: 10px 13px 12px; }
+  .breakdown-title { font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .breakdown-factor { margin-bottom: 9px; }
+  .breakdown-factor:last-child { margin-bottom: 0; }
+  .breakdown-factor-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .breakdown-factor-name { font-size: 10px; font-family: var(--mono); color: var(--text); font-weight: 600; flex: 1; }
+  .breakdown-factor-score { font-size: 9px; font-family: var(--mono); color: var(--dim); }
+  .breakdown-mini-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+  .breakdown-mini-fill  { height: 100%; border-radius: 2px; }
+  .breakdown-factor-desc { font-size: 9px; font-family: var(--mono); color: var(--dim); line-height: 1.5; padding-left: 2px; }
+  .breakdown-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 10px 0; }
+  .subscore-tap-hint { font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.2); text-align: center; padding: 4px 0 2px; letter-spacing: 0.04em; }
+
+  /* Instant custom tooltip (replaces browser title delay) */
+  #inv-tooltip { position: fixed; background: #1c2535; border: 1px solid rgba(255,255,255,0.12); color: var(--text); font-size: 10px; font-family: var(--mono); padding: 5px 10px; border-radius: 5px; pointer-events: none; z-index: 300; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: none; }
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
   .modal { background: #161e28; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 22px; width: 100%; max-width: 460px; max-height: 85vh; overflow-y: auto; }
   .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
@@ -172,12 +202,12 @@
 <div class="best-bet" id="bestBet"></div>
 <div id="forecast"><div class="state-msg loading">Fetching forecast…</div></div>
 <div class="footer">
-  Inversion score (0–100): Warm Air Lid strength (40 pts) + calm overnight wind (25 pts) + clear overnight sky for radiative cooling (20 pts) + surface near dewpoint / fog likely (15 pts) + morning low cloud already present in valley (up to +10 bonus) ·
-  Cloud top (est.) = valley elevation + LCL cloud base height (derived from temperature–dewpoint spread) ·
-  "Above cloud top" = peak elevation is higher than the estimated cloud top — you'd be on a ridge looking down at the cloud sea ·
-  "Warm air lid" = air aloft is warmer than valley surface, trapping cold air and cloud below ridge level ·
-  Best window: ~30–90 min around sunrise as the inversion layer peaks then gradually lifts ·
-  Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo ECMWF IFS</a>
+  <b>Setup score</b> (overnight, midnight→sunrise): Warm Air Lid strength (40) + calm wind (25) + clear sky/radiative cooling (20) + surface near dewpoint (15) = max 100 ·
+  <b>Peak score</b> (sunrise window, ±2h): Warm Air Lid strength (40) + calm wind (20) + low cloud already present (25) + surface saturation (15) = max 100 ·
+  Combined score = average of both · Today/tomorrow shows Peak as primary; future days show Setup as primary ·
+  Cloud top (est.) = valley elevation + LCL cloud base (temperature–dewpoint spread) ·
+  "Warm air lid" = air aloft warmer than valley surface, trapping cold air and cloud below ridge level ·
+  Best window: ~30–90 min around sunrise · Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo ECMWF IFS</a>
 </div>
 
 <script>
@@ -197,10 +227,24 @@ const DEFAULT_GROUPS = [{
 }];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let groups       = [];
-let activeId     = null;
-let forecast     = {};   // id → { days } | { error } | null (loading)
-let expandedDay  = null;
+let groups            = [];
+let activeId          = null;
+let forecast          = {};   // id → { days } | { error } | null (loading)
+let expandedDay       = null;
+let expandedBreakdown = new Set(); // card indices with score breakdown open
+
+function toggleBreakdown(i, e) {
+  e.stopPropagation();
+  if (expandedBreakdown.has(i)) {
+    // Breakdown is open — close it, restore hourly if card was expanded
+    expandedBreakdown.delete(i);
+  } else {
+    // Open breakdown — card must be expanded, hide hourly
+    expandedDay = i;           // ensure card is "expanded" so it stays open
+    expandedBreakdown.add(i);
+  }
+  renderForecast();
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const C2F  = c  => Math.round(c * 9 / 5 + 32);
@@ -255,64 +299,98 @@ function processDay(raw, di, group) {
   const srMs       = sunriseStr ? new Date(sunriseStr).getTime() : null;
   const ssMs       = sunsetStr  ? new Date(sunsetStr).getTime()  : null;
 
-  // Scoring window: midnight → sunrise (overnight radiative cooling)
-  const scoreStart = new Date(date + "T00:00").getTime();
-  const scoreEnd   = srMs ?? new Date(date + "T07:00").getTime();
+  // ── Window definitions ────────────────────────────────────────────────────
+  // Setup window: midnight → sunrise (overnight conditions that allow inversion to form)
+  const setupStart = new Date(date + "T00:00").getTime();
+  const setupEnd   = srMs ?? new Date(date + "T07:00").getTime();
+  // Peak window: sunrise - 2h → sunrise + 1h (the actual shoot window)
+  const peakStart  = srMs ? srMs - 7200000 : new Date(date + "T05:00").getTime();
+  const peakEnd    = srMs ? srMs + 3600000 : new Date(date + "T08:00").getTime();
+  // Display window: 1am → sunrise + 2h
+  const dispStart  = new Date(date + "T01:00").getTime();
+  const dispEnd    = srMs ? srMs + 7200000 : new Date(date + "T09:00").getTime();
 
-  // Display window: 1am → sunrise + 2h (what photographer sees)
-  const dispStart = new Date(date + "T01:00").getTime();
-  const dispEnd   = srMs ? srMs + 7200000 : new Date(date + "T09:00").getTime();
-
-  const scoreIdxs = [], dispIdxs = [];
+  const setupIdxs = [], peakIdxs = [], dispIdxs = [];
   times.forEach((t, i) => {
     const ms = new Date(t).getTime();
-    if (ms >= scoreStart && ms < scoreEnd) scoreIdxs.push(i);
+    if (ms >= setupStart && ms < setupEnd) setupIdxs.push(i);
+    if (ms >= peakStart  && ms < peakEnd)  peakIdxs.push(i);
     if (ms >= dispStart  && ms <= dispEnd) dispIdxs.push(i);
   });
 
-  // Fallback if no overnight hours found
-  const workIdxs = scoreIdxs.length > 0 ? scoreIdxs : dispIdxs;
+  // Fallback
+  const workIdxs = setupIdxs.length > 0 ? setupIdxs : peakIdxs.length > 0 ? peakIdxs : dispIdxs;
   if (workIdxs.length === 0) {
-    return { date, sunriseStr, sunsetStr, score: 0, label: "No Data", color: "var(--dim)",
+    return { date, sunriseStr, sunsetStr,
+             setupScore: 0, peakScore: 0, score: 0,
+             label: "No Data", color: "var(--dim)",
              layerTopFt: null, peakStatus: [], hourlyDetail: [], moon: moonPhase(date) };
   }
 
-  const get = key => workIdxs.map(i => h[key]?.[i] ?? 0);
-  const avgT2m    = mean(get("temperature_2m"));
-  const avgTd     = mean(get("dewpoint_2m"));
-  const avgWind   = mean(get("windspeed_10m"));
-  const avgCloud  = mean(get("cloudcover"));
-  const avgT850   = mean(get("temperature_850hPa"));
+  // Helper: average a field over a set of indices
+  const avg = (idxs, key) => mean(idxs.map(i => h[key]?.[i] ?? 0));
 
-  // Low cloud cover (~0–6,500 ft) near sunrise — direct evidence of valley fog/cloud forming
-  // Use dispIdxs (morning window) for this signal since we want cloud already present at dawn
+  // ── Setup score (overnight window) ────────────────────────────────────────
+  const si = setupIdxs.length > 0 ? setupIdxs : workIdxs;
+  const s_t2m   = avg(si, "temperature_2m");
+  const s_td    = avg(si, "dewpoint_2m");
+  const s_wind  = avg(si, "windspeed_10m");
+  const s_cloud = avg(si, "cloudcover");
+  const s_t850  = avg(si, "temperature_850hPa");
+  const s_inv   = s_t850 - s_t2m;
+  const s_spread = s_t2m - s_td;
+
+  const sThermal = Math.round(Math.min(40, Math.max(0, s_inv * 6)));
+  const sWind    = s_wind < 4 ? 25 : s_wind < 8 ? 17 : s_wind < 13 ? 7 : 0;
+  const sSky     = s_cloud < 15 ? 20 : s_cloud < 35 ? 12 : s_cloud < 55 ? 5 : 0;
+  const sSatur   = s_spread < 2 ? 15 : s_spread < 4 ? 10 : s_spread < 7 ? 5 : 0;
+  const setupScore = sThermal + sWind + sSky + sSatur;  // max 100
+
+  // ── Peak score (sunrise window) ───────────────────────────────────────────
+  const pi2 = peakIdxs.length > 0 ? peakIdxs : dispIdxs.slice(0, Math.ceil(dispIdxs.length / 2));
+  const p_t2m      = avg(pi2, "temperature_2m");
+  const p_td       = avg(pi2, "dewpoint_2m");
+  const p_wind     = avg(pi2, "windspeed_10m");
+  const p_t850     = avg(pi2, "temperature_850hPa");
+  const p_lowCloud = avg(pi2, "cloudcover_low");
+  const p_inv      = p_t850 - p_t2m;
+  const p_spread   = p_t2m - p_td;
+
+  const pThermal  = Math.round(Math.min(40, Math.max(0, p_inv * 6)));
+  const pWind     = p_wind < 4 ? 20 : p_wind < 8 ? 13 : p_wind < 13 ? 5 : 0;
+  const pLowCloud = p_lowCloud > 60 ? 25 : p_lowCloud > 35 ? 16 : p_lowCloud > 15 ? 7 : 0;
+  const pSatur    = p_spread < 2 ? 15 : p_spread < 4 ? 10 : p_spread < 7 ? 5 : 0;
+  const peakScore = pThermal + pWind + pLowCloud + pSatur;  // max 100
+
+  // Primary score used for labeling/sorting: average of both (balanced signal)
+  const score = Math.round((setupScore + peakScore) / 2);
+
+  // ── Low cloud (morning, for conditions display) ────────────────────────────
   const morningIdxs = dispIdxs.length > 0 ? dispIdxs : workIdxs;
   const avgLowCloud = mean(morningIdxs.map(i => h.cloudcover_low?.[i] ?? 0));
 
-  // ── Scoring ──────────────────────────────────────────────────────────────
-  const invDelta     = avgT850 - avgT2m;
-  const thermalScore = Math.round(Math.min(40, Math.max(0, invDelta * 6)));
-  const windScore    = avgWind < 4 ? 25 : avgWind < 8 ? 17 : avgWind < 13 ? 7 : 0;
-  const cloudScore   = avgCloud < 15 ? 20 : avgCloud < 35 ? 12 : avgCloud < 55 ? 5 : 0;
-  const tdSpread     = avgT2m - avgTd;
-  const dpScore      = tdSpread < 2 ? 15 : tdSpread < 4 ? 10 : tdSpread < 7 ? 5 : 0;
-  // Low cloud bonus: morning low cloud in the valley = inversion already forming (up to +10 bonus)
-  const lowCloudBonus = avgLowCloud > 60 ? 10 : avgLowCloud > 35 ? 6 : avgLowCloud > 15 ? 2 : 0;
-  const score        = thermalScore + windScore + cloudScore + dpScore + lowCloudBonus;
+  // ── Averaged values for conditions grid (use setup window for overnight signals) ──
+  const avgT2m   = s_t2m, avgTd = s_td, avgWind = s_wind, avgCloud = s_cloud, avgT850 = s_t850;
+  const invDelta = s_inv;
+  const tdSpread = s_spread;
 
-  // ── Layer top (LCL) ──────────────────────────────────────────────────────
-  // Use minimum spread during scoring window for best-case cloud base
-  const minSpread = Math.min(...workIdxs.map(i => Math.max(0, (h.temperature_2m[i] ?? 0) - (h.dewpoint_2m[i] ?? 0))));
-  const lclFt     = minSpread * 125 * 3.28084;    // LCL(m) = 125*(T-Td)°C → ft
+  // ── Layer top (LCL) — use peak/sunrise window for most relevant estimate ──
+  const lclIdxs  = pi2.length > 0 ? pi2 : workIdxs;
+  const minSpread = Math.min(...lclIdxs.map(i => Math.max(0, (h.temperature_2m[i] ?? 0) - (h.dewpoint_2m[i] ?? 0))));
+  const lclFt     = minSpread * 125 * 3.28084;
   const layerTopFt = Math.round(group.valley.elevFt + lclFt);
 
-  // ── Labels ───────────────────────────────────────────────────────────────
-  let label, color;
-  if      (score < 20) { label = "Unlikely";  color = "var(--score-none)"; }
-  else if (score < 40) { label = "Low";       color = "var(--score-low)";  }
-  else if (score < 58) { label = "Possible";  color = "var(--score-mid)";  }
-  else if (score < 74) { label = "Likely";    color = "var(--score-high)"; }
-  else                 { label = "Strong";    color = "var(--score-vhigh)";}
+  // ── Labels — based on combined score ─────────────────────────────────────
+  function scoreLabel(s) {
+    if (s < 20) return { label: "Unlikely", color: "var(--score-none)" };
+    if (s < 40) return { label: "Low",      color: "var(--score-low)"  };
+    if (s < 58) return { label: "Possible", color: "var(--score-mid)"  };
+    if (s < 74) return { label: "Likely",   color: "var(--score-high)" };
+    return              { label: "Strong",  color: "var(--score-vhigh)"};
+  }
+  const { label: setupLabel, color: setupColor } = scoreLabel(setupScore);
+  const { label: peakLabel,  color: peakColor  } = scoreLabel(peakScore);
+  const { label, color } = scoreLabel(score);
 
   // ── Peak status ──────────────────────────────────────────────────────────
   const peakStatus = group.peaks.map(p => {
@@ -325,45 +403,58 @@ function processDay(raw, di, group) {
   // ── Hourly detail ─────────────────────────────────────────────────────────
   const hourlyDetail = dispIdxs.map(i => {
     const tMs    = new Date(times[i]).getTime();
-    const t2     = h.temperature_2m[i] ?? 0;
-    const td2    = h.dewpoint_2m[i] ?? 0;
-    const t850   = h.temperature_850hPa[i] ?? 0;
+    const t2     = h.temperature_2m[i]       ?? 0;
+    const td2    = h.dewpoint_2m[i]           ?? 0;
+    const t850   = h.temperature_850hPa[i]    ?? 0;
     const spread = Math.max(0, t2 - td2);
     const lFt    = Math.round(group.valley.elevFt + spread * 125 * 3.28084);
+    const lowCld = Math.round(h.cloudcover_low?.[i] ?? 0);
     return {
       ms:        tMs,
       t2f:       C2F(t2),
       t850f:     C2F(t850),
-      invDeltaC: +(t850 - t2).toFixed(1),
       wind:      Math.round(h.windspeed_10m[i] ?? 0),
-      cloud:     Math.round(h.cloudcover[i]    ?? 0),
+      lowCloud:  lowCld,
       layerFt:   lFt,
       isSunrise: srMs != null && Math.abs(tMs - srMs) < 1800000,
       isGolden:  srMs != null && tMs >= srMs - 1800000 && tMs <= srMs + 5400000,
-      peaksAbove: group.peaks.filter(p => p.elevFt > lFt).length,
     };
   });
 
   const moon = moonPhase(date);
   const precipChance = d.precipitation_probability_max?.[di] ?? 0;
 
-  // Valley temp at/near sunrise for display — use first dispIdx hour near sunrise
-  const srIdx = srMs != null
+  // Valley temp at/near sunrise
+  const srIdx = srMs != null && dispIdxs.length > 0
     ? dispIdxs.reduce((best, i) => {
         const ms = new Date(times[i]).getTime();
         return Math.abs(ms - srMs) < Math.abs(new Date(times[best]).getTime() - srMs) ? i : best;
-      }, dispIdxs[0] ?? workIdxs[0] ?? 0)
+      }, dispIdxs[0])
     : (dispIdxs[0] ?? workIdxs[0] ?? 0);
   const valleyTempF = C2F(h.temperature_2m[srIdx] ?? avgT2m);
 
+  // Sunrise-hour snapshot for conditions grid
+  const srCond = {
+    wind:     Math.round(h.windspeed_10m[srIdx]   ?? avgWind),
+    lowCloud: Math.round(h.cloudcover_low?.[srIdx] ?? avgLowCloud),
+    tdSpread: Math.round(((h.temperature_2m[srIdx] ?? avgT2m) - (h.dewpoint_2m[srIdx] ?? avgTd)) * 9 / 5),
+    invOk:    (h.temperature_850hPa[srIdx] ?? avgT850) > (h.temperature_2m[srIdx] ?? avgT2m),
+    inv850F:  C2F(h.temperature_850hPa[srIdx] ?? avgT850),
+    surfF:    C2F(h.temperature_2m[srIdx] ?? avgT2m),
+  };
+
   return {
-    date, sunriseStr, sunsetStr, score, label, color,
-    layerTopFt, invDelta: +invDelta.toFixed(1), invConfirmed: invDelta > 0,
+    date, sunriseStr, sunsetStr,
+    setupScore, peakScore, score, label, color,
+    setupLabel, setupColor, peakLabel, peakColor,
+    layerTopFt,
+    invDelta: +invDelta.toFixed(1), invConfirmed: invDelta > 0,
     avgWind: Math.round(avgWind), avgCloud: Math.round(avgCloud),
     tdSpreadF: Math.round(tdSpread * 9 / 5),
-    thermalScore, windScore, cloudScore, dpScore, lowCloudBonus,
+    sThermal, sWind, sSky, sSatur,
+    pThermal, pWind, pLowCloud, pSatur,
     avgLowCloud: Math.round(avgLowCloud),
-    valleyTempF,
+    valleyTempF, srCond,
     peakStatus, hourlyDetail, moon, precipChance,
   };
 }
@@ -543,7 +634,20 @@ function renderCard(day, i, group) {
     ? `<span style="color:var(--score-high)">Warm air lid: ${Math.round(day.invDelta * 9/5)}°F warmer aloft ✓</span>`
     : `<span style="color:var(--dim)">No warm air lid detected</span>`;
 
-  // Peaks — cloud top shown as reference row above peaks
+  // For today/tomorrow emphasize PEAK; for future days emphasize SETUP
+  const dayMs   = new Date(day.date + "T12:00:00").getTime();
+  const nowMs   = Date.now();
+  const daysOut = Math.round((dayMs - nowMs) / 86400000);
+  const primaryIsPeak = daysOut <= 1;
+
+  const primScore = primaryIsPeak ? day.peakScore  : day.setupScore;
+  const primLabel = primaryIsPeak ? day.peakLabel  : day.setupLabel;
+  const primColor = primaryIsPeak ? day.peakColor  : day.setupColor;
+  const primTag   = primaryIsPeak ? "At Sunrise"   : "Overnight Setup";
+  const secScore  = primaryIsPeak ? day.setupScore : day.peakScore;
+  const secLabel  = primaryIsPeak ? day.setupLabel : day.peakLabel;
+  const secColor  = primaryIsPeak ? day.setupColor : day.peakColor;
+  const secTag    = primaryIsPeak ? "Setup"        : "At Sunrise";
   const peakRows = `
     <div style="font-size:9px;font-family:var(--mono);color:rgba(255,255,255,0.18);display:flex;justify-content:space-between;padding:0 0 5px 0;border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:3px">
       <span>PEAK</span>
@@ -569,95 +673,230 @@ function renderCard(day, i, group) {
       </div>`;
     }).join("")}`;
 
-  // Conditions
-  const wColor  = day.avgWind     <= 5  ? "good" : day.avgWind  <= 11 ? "ok" : "poor";
-  const cColor  = day.avgCloud    <= 20 ? "good" : day.avgCloud  <= 45 ? "ok" : "poor";
-  const lcColor = day.avgLowCloud >= 50 ? "good" : day.avgLowCloud >= 20 ? "ok" : "poor";
-  const dColor  = day.tdSpreadF   <= 5  ? "good" : day.tdSpreadF <= 9  ? "ok" : "poor";
-  const iColor  = day.invConfirmed      ? "good" : "poor";
+  // Sunrise-hour conditions for the grid
+  const sc    = day.srCond;
+  const wColor  = sc.wind     <= 5  ? "good" : sc.wind     <= 11 ? "ok" : "poor";
+  const lcColor = sc.lowCloud >= 50 ? "good" : sc.lowCloud >= 20 ? "ok" : "poor";
+  const dColor  = sc.tdSpread <= 5  ? "good" : sc.tdSpread <= 9  ? "ok" : "poor";
+  const iColor  = sc.invOk          ? "good" : "poor";
 
-  // Sub-score bars
-  const barH = (v, max) => Math.max(2, Math.round((v / max) * 28));
-  const barColor = (v, max) => {
-    const pct = v / max;
-    return pct > 0.65 ? "var(--above)" : pct > 0.35 ? "var(--edge)" : "var(--dim)";
-  };
-  const bars = [
-    { v: day.thermalScore,   max: 40, label: "Thermal" },
-    { v: day.windScore,      max: 25, label: "Wind"    },
-    { v: day.cloudScore,     max: 20, label: "Sky"     },
-    { v: day.dpScore,        max: 15, label: "Satur"   },
-    { v: day.lowCloudBonus,  max: 10, label: "Low Cloud"},
-  ].map(b => `<div class="subscore-bar" style="height:${barH(b.v,b.max)}px;background:${barColor(b.v,b.max)};flex:1" title="${b.label}: ${b.v}/${b.max}"></div>`).join("");
+  // Dynamic plain-English explanations for breakdown panel
+  function explainFactor(id, val, max) {
+    const pct = val / max;
+    const bar = `<div class="breakdown-mini-track"><div class="breakdown-mini-fill" style="width:${Math.round(pct*100)}%;background:${pct>0.65?"var(--above)":pct>0.35?"var(--edge)":"var(--dim)"}"></div></div>`;
+    switch(id) {
+      case 's-thermal': {
+        const dF = Math.round(day.invDelta * 9/5);
+        const desc = dF > 10 ? `${dF}°F warmer aloft — very strong lid trapping cold air.`
+                   : dF > 4  ? `${dF}°F warmer aloft — solid inversion layer present.`
+                   : dF > 0  ? `${dF}°F warmer aloft — weak lid, inversion marginal.`
+                   :            `Air aloft is cooler than surface — no inversion lid.`;
+        return [bar, desc];
+      }
+      case 's-wind': {
+        const desc = day.avgWind <= 4 ? `${day.avgWind} mph overnight — near-perfect calm. Cold air will pool.`
+                   : day.avgWind <= 8 ? `${day.avgWind} mph overnight — light wind, pooling likely.`
+                   : day.avgWind <= 13? `${day.avgWind} mph overnight — moderate wind may disrupt pooling.`
+                   :                    `${day.avgWind} mph overnight — too windy for cold air to pool.`;
+        return [bar, desc];
+      }
+      case 's-sky': {
+        const desc = day.avgCloud <= 15 ? `${day.avgCloud}% cloud cover overnight — clear sky, strong radiative cooling.`
+                   : day.avgCloud <= 35 ? `${day.avgCloud}% cloud cover — mostly clear, decent cooling.`
+                   : day.avgCloud <= 55 ? `${day.avgCloud}% cloud cover — partly cloudy, limited cooling.`
+                   :                      `${day.avgCloud}% cloud cover — overcast overnight, minimal surface cooling.`;
+        return [bar, desc];
+      }
+      case 's-satur': {
+        const desc = day.tdSpreadF <= 3 ? `T-Dew spread ${day.tdSpreadF}°F — air nearly saturated, fog almost certain.`
+                   : day.tdSpreadF <= 6 ? `T-Dew spread ${day.tdSpreadF}°F — moist air, fog likely.`
+                   : day.tdSpreadF <= 9 ? `T-Dew spread ${day.tdSpreadF}°F — moderate moisture, some fog potential.`
+                   :                      `T-Dew spread ${day.tdSpreadF}°F — dry air, fog unlikely.`;
+        return [bar, desc];
+      }
+      case 'p-thermal': {
+        const dF = Math.round(day.invDelta * 9/5);
+        const desc = dF > 10 ? `${dF}°F warmer at 850mb at sunrise — inversion well established.`
+                   : dF > 4  ? `${dF}°F warmer at 850mb — inversion present at shoot time.`
+                   : dF > 0  ? `${dF}°F warmer at 850mb — weak inversion, may not hold.`
+                   :            `No warm air lid at sunrise — inversion unlikely.`;
+        return [bar, desc];
+      }
+      case 'p-wind': {
+        const desc = sc.wind <= 4 ? `${sc.wind} mph at sunrise — ideal, cloud layer will hold.`
+                   : sc.wind <= 8 ? `${sc.wind} mph at sunrise — light, layer should persist.`
+                   : sc.wind <= 13? `${sc.wind} mph at sunrise — may start to erode layer.`
+                   :                `${sc.wind} mph at sunrise — wind likely breaking up the layer.`;
+        return [bar, desc];
+      }
+      case 'p-lowcloud': {
+        const desc = sc.lowCloud >= 60 ? `${sc.lowCloud}% low cloud at sunrise — valley cloud confirmed present.`
+                   : sc.lowCloud >= 30 ? `${sc.lowCloud}% low cloud at sunrise — valley cloud forming.`
+                   : sc.lowCloud >= 10 ? `${sc.lowCloud}% low cloud — some valley cloud, layer may be thin.`
+                   :                     `${sc.lowCloud}% low cloud — little valley cloud visible yet.`;
+        return [bar, desc];
+      }
+      case 'p-satur': {
+        const desc = sc.tdSpread <= 3 ? `T-Dew ${sc.tdSpread}°F at sunrise — saturated, cloud layer dense.`
+                   : sc.tdSpread <= 6 ? `T-Dew ${sc.tdSpread}°F at sunrise — moist, cloud persisting.`
+                   : sc.tdSpread <= 9 ? `T-Dew ${sc.tdSpread}°F at sunrise — drying, cloud may thin.`
+                   :                    `T-Dew ${sc.tdSpread}°F at sunrise — dry air, cloud burning off quickly.`;
+        return [bar, desc];
+      }
+      default: return [bar, ""];
+    }
+  }
+
+  function breakdownRow(name, id, val, max) {
+    const [bar, desc] = explainFactor(id, val, max);
+    return `<div class="breakdown-factor">
+      <div class="breakdown-factor-head">
+        <span class="breakdown-factor-name">${name}</span>
+        ${bar}
+        <span class="breakdown-factor-score">${val}/${max}</span>
+      </div>
+      <div class="breakdown-factor-desc">${desc}</div>
+    </div>`;
+  }
+
+  const isBreakdown = expandedBreakdown.has(i);
+  // Hourly shows when card is expanded but breakdown is not open
+  const showHourly  = isExp && !isBreakdown;
+  const breakdownHtml = isBreakdown ? `<div class="breakdown-panel" onclick="event.stopPropagation()">
+    <div class="breakdown-title">Setup Score · ${day.setupScore}/100 · overnight conditions</div>
+    ${breakdownRow("Warm Air Lid",    "s-thermal", day.sThermal, 40)}
+    ${breakdownRow("Overnight Wind",  "s-wind",    day.sWind,    25)}
+    ${breakdownRow("Clear Sky",       "s-sky",     day.sSky,     20)}
+    ${breakdownRow("Air Saturation",  "s-satur",   day.sSatur,   15)}
+    <div class="breakdown-divider"></div>
+    <div class="breakdown-title">Sunrise Score · ${day.peakScore}/100 · at shoot time</div>
+    ${breakdownRow("Warm Air Lid",    "p-thermal",  day.pThermal,  40)}
+    ${breakdownRow("Wind at Sunrise", "p-wind",     day.pWind,     20)}
+    ${breakdownRow("Low Cloud",       "p-lowcloud", day.pLowCloud, 25)}
+    ${breakdownRow("Air Saturation",  "p-satur",    day.pSatur,    15)}
+  </div>` : "";
+
+  // New fixed-track subscore bars — two groups: Setup | At Sunrise
+  function makeBar(earned, max, fillColor) {
+    const pct = Math.round((earned / max) * 100);
+    return `<div class="subscore-track"><div class="subscore-fill" style="height:${pct}%;background:${fillColor}"></div></div>`;
+  }
+  const cSetup = day.setupScore >= 60 ? "var(--above)" : day.setupScore >= 35 ? "var(--edge)" : "var(--dim)";
+  const cPeak  = day.peakScore  >= 60 ? "var(--above)" : day.peakScore  >= 35 ? "var(--edge)" : "var(--dim)";
+
+  const setupBars = [
+    { v: day.sThermal, max: 40 }, { v: day.sWind, max: 25 },
+    { v: day.sSky,     max: 20 }, { v: day.sSatur, max: 15 },
+  ].map(b => makeBar(b.v, b.max, cSetup)).join("");
+
+  const peakBars = [
+    { v: day.pThermal,  max: 40 }, { v: day.pWind,    max: 20 },
+    { v: day.pLowCloud, max: 25 }, { v: day.pSatur,   max: 15 },
+  ].map(b => makeBar(b.v, b.max, cPeak)).join("");
 
   // Hourly detail
-  const hourlyHtml = isExp ? renderHourly(day, group) : "";
+  const hourlyHtml = showHourly ? renderHourly(day, group) : "";
 
   return `<div class="${cardCls}" onclick="toggleDay(${i})">
     <div class="card-head">
       <div class="card-date">${fmtDate(day.date)} ${tagHtml}</div>
       <div class="card-astro">🌅 ${srStr} &nbsp; 🌇 ${ssStr} &nbsp; ${day.moon.emoji} ${day.moon.pct}%&nbsp;<span style="color:rgba(255,255,255,0.15)" title="${day.moon.name}">${day.moon.name}</span>${precipStr}</div>
     </div>
-    <div class="score-block">
-      <div class="score-num" style="color:${day.color}">${day.score}</div>
-      <div class="score-right">
-        <div class="score-label" style="color:${day.color}">${day.label}</div>
-        <div class="score-layer">Cloud top (est.): ${layerStr}<br>${invStr}</div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:${day.score}%;background:${day.color}"></div></div>
+    <div class="dual-score">
+      <div class="dual-score-primary">
+        <div class="dscore-num-big" style="color:${primColor}">${primScore}</div>
+        <div style="flex:1;min-width:0">
+          <div class="dscore-tag">${primTag}</div>
+          <div class="dscore-label" style="color:${primColor}">${primLabel}</div>
+          <div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--accent);margin-top:3px;letter-spacing:-0.02em">${layerStr}</div>
+          <div style="font-size:9px;font-weight:600;font-family:var(--mono);color:rgba(79,163,224,0.55);margin-top:1px;letter-spacing:0.04em">CLOUD TOP (EST.)</div>
+          <div style="font-size:9px;font-family:var(--mono);color:var(--dim);margin-top:3px">${invStr}</div>
+          <div class="dscore-bar-track"><div class="dscore-bar-fill" style="width:${primScore}%;background:${primColor}"></div></div>
+        </div>
+      </div>
+      <div class="dual-score-secondary">
+        <div class="dscore-tag">${secTag}</div>
+        <div class="dscore-num-sm" style="color:${secColor};opacity:0.8">${secScore}</div>
+        <div style="font-size:9px;font-family:var(--mono);color:${secColor};opacity:0.6;margin-top:1px">${secLabel}</div>
       </div>
     </div>
     ${renderElevationDiagram(day, group)}
     <div class="peaks-block">${peakRows}</div>
+    <div style="padding:3px 13px 0;font-size:7px;font-family:var(--mono);color:rgba(255,255,255,0.25);letter-spacing:0.08em;text-transform:uppercase">Sunrise Conditions</div>
     <div class="cond-block">
-      <div class="cond-item" title="Average overnight wind speed. Under 5 mph is ideal — calm air lets cold air pool in the valley."><div class="cond-val ${wColor}">${day.avgWind}</div><div class="cond-label">Wind mph</div></div>
-      <div class="cond-item" title="Low cloud cover (below ~6,500 ft) in the morning near sunrise. High % means valley fog/cloud is already forming — a strong direct sign of inversion."><div class="cond-val ${lcColor}">${day.avgLowCloud}%</div><div class="cond-label">Low Cloud</div></div>
-      <div class="cond-item" title="Temperature minus dewpoint (°F). Under 5° means the air is nearly saturated and fog or cloud will form easily."><div class="cond-val ${dColor}">${day.tdSpreadF}°</div><div class="cond-label">T–Dew °F</div></div>
-      <div class="cond-item" title="Warm Air Lid: warm air sitting above the cold valley air acts as a cap, trapping the cloud layer below ridge level. This is the key ingredient for a valley inversion."><div class="cond-val ${iColor}">${day.invConfirmed ? "✓" : "✗"}</div><div class="cond-label">Warm Lid</div></div>
+      <div class="cond-item" data-tip="Wind speed at sunrise. Under 5 mph ideal."><div class="cond-val ${wColor}">${sc.wind}</div><div class="cond-label">Wind mph</div></div>
+      <div class="cond-item" data-tip="Low cloud cover at sunrise. High % = valley fog present."><div class="cond-val ${lcColor}">${sc.lowCloud}%</div><div class="cond-label">Low Cloud</div></div>
+      <div class="cond-item" data-tip="Temperature minus dewpoint at sunrise. Under 5° = nearly saturated."><div class="cond-val ${dColor}">${sc.tdSpread}°</div><div class="cond-label">T–Dew °F</div></div>
+      <div class="cond-item" data-tip="Warm air lid at sunrise. ✓ = 850mb warmer than surface."><div class="cond-val ${iColor}">${sc.invOk ? "✓" : "✗"}</div><div class="cond-label">Warm Lid</div></div>
     </div>
-    <div class="subscore-block" title="Sub-scores: Thermal · Wind · Sky · Saturation">${bars}</div>
+    <div class="subscore-section" onclick="toggleBreakdown(${i}, event)">
+      <div class="subscore-tap-hint">${isBreakdown ? "▲ tap to show hourly detail" : "▼ tap for score breakdown"}</div>
+      <div style="display:flex;gap:8px;margin-bottom:2px">
+        <div style="flex:1">
+          <div class="subscore-row">${setupBars}</div>
+          <div class="subscore-labels">
+            <span class="subscore-lbl">Therm</span><span class="subscore-lbl">Wind</span><span class="subscore-lbl">Sky</span><span class="subscore-lbl">Satur</span>
+          </div>
+          <div style="font-size:7px;font-family:var(--mono);color:${cSetup};opacity:0.6;text-align:center;margin-top:2px">SETUP</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,0.05);margin:2px 0"></div>
+        <div style="flex:1">
+          <div class="subscore-row">${peakBars}</div>
+          <div class="subscore-labels">
+            <span class="subscore-lbl">Therm</span><span class="subscore-lbl">Wind</span><span class="subscore-lbl">LowCld</span><span class="subscore-lbl">Satur</span>
+          </div>
+          <div style="font-size:7px;font-family:var(--mono);color:${cPeak};opacity:0.6;text-align:center;margin-top:2px">AT SUNRISE</div>
+        </div>
+      </div>
+    </div>
+    ${breakdownHtml}
     ${hourlyHtml}
   </div>`;
 }
 
 function renderHourly(day, group) {
   if (!day.hourlyDetail.length) return "";
-  const srMs = day.sunriseStr ? new Date(day.sunriseStr).getTime() : null;
-  const maxDelta = Math.max(1, ...day.hourlyDetail.map(h => Math.max(0, h.invDeltaC)));
 
   const rows = day.hourlyDetail.map(h => {
-    const timeStr = new Date(h.ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
-    const rowCls  = h.isSunrise ? "h-row is-sunrise" : h.isGolden ? "h-row is-golden" : "h-row";
-    const invPct  = Math.round(Math.max(0, h.invDeltaC) / maxDelta * 100);
-    const invColor = invPct > 65 ? "var(--score-high)" : invPct > 30 ? "var(--score-mid)" : "var(--dim)";
-    const invBadge = h.invDeltaC > 0
-      ? `<span class="inv-badge" style="background:${invColor}22;color:${invColor}">+${Math.round(h.invDeltaC * 9/5)}°F</span>`
-      : `<span style="color:var(--dim);font-size:9px">—</span>`;
-    const peakStr  = h.peaksAbove > 0
-      ? `<span style="color:var(--above)">${h.peaksAbove}/${group.peaks.length} ↑</span>`
-      : `<span style="color:var(--dim)">0/${group.peaks.length}</span>`;
+    const timeStr  = new Date(h.ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+    const rowCls   = h.isSunrise ? "h-row is-sunrise" : h.isGolden ? "h-row is-golden" : "h-row";
     const isSrMark = h.isSunrise ? `<span style="color:#c4aa4a;font-size:9px"> ☀</span>` : "";
+    const windCol  = `<span style="color:${h.wind <= 5 ? "var(--above)" : h.wind <= 10 ? "var(--edge)" : "var(--dim)"}">${h.wind}</span>`;
+    const lcPct    = h.lowCloud;
+    const lcCol    = `<span style="color:${lcPct >= 50 ? "var(--above)" : lcPct >= 20 ? "var(--edge)" : "var(--dim)"}">${lcPct}%</span>`;
+    const ctStr    = h.layerFt ? (h.layerFt / 1000).toFixed(1) + "k" : "—";
+    const ctColor  = day.peakStatus?.some(ps => ps?.status === "above") ? "var(--above)" : "var(--dim)";
 
     return `<div class="${rowCls}">
       <span style="color:var(--dim)">${timeStr}${isSrMark}</span>
       <span>${h.t2f}°F</span>
       <span style="color:var(--dim)">${h.t850f}°F</span>
-      ${invBadge}
-      <span style="color:${h.wind <= 8 ? "var(--above)" : "var(--dim)"}">${h.wind}</span>
-      ${peakStr}
+      ${windCol}
+      ${lcCol}
+      <span style="color:${ctColor}">${ctStr}</span>
     </div>`;
   }).join("");
 
   return `<div class="hourly-expand" onclick="event.stopPropagation()">
     <div class="hourly-expand-head">
-      <span>Time</span><span>Surf</span><span>850mb</span><span>ΔInv</span><span>Wind</span><span>Peaks↑</span>
+      <span>Time</span><span>Surf</span><span>850mb</span><span>Wind</span><span>LowCld</span><span>CldTop</span>
     </div>
     ${rows}
-    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise · ΔInv = how much warmer 850mb is than surface (°F) — positive means cold air is trapped below</div>
+    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise · 850mb = temp at ~5,500 ft (warmer than Surf = inversion) · CldTop = estimated cloud top that hour</div>
   </div>`;
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function toggleDay(i) { expandedDay = expandedDay === i ? null : i; renderForecast(); }
+function toggleDay(i) {
+  if (expandedBreakdown.has(i)) {
+    // Breakdown is showing — tap card body closes breakdown, shows hourly
+    expandedBreakdown.delete(i);
+    expandedDay = i;
+  } else {
+    expandedDay = expandedDay === i ? null : i;
+  }
+  renderForecast();
+}
 
 function selectGroup(id) {
   activeId = id; expandedDay = null; render();
@@ -769,6 +1008,24 @@ groups   = loadGroups() ?? [...DEFAULT_GROUPS];
 activeId = allGroups()[0].id;
 render();
 setTimeout(() => fetchGroup(activeId), 0);
+
+// ─── Instant tooltip (no browser title delay) ─────────────────────────────────
+(function() {
+  const tt = document.createElement("div");
+  tt.id = "inv-tooltip";
+  document.body.appendChild(tt);
+  document.addEventListener("mouseover", e => {
+    const el = e.target.closest("[data-tip]");
+    if (el) { tt.textContent = el.dataset.tip; tt.style.display = "block"; }
+    else tt.style.display = "none";
+  });
+  document.addEventListener("mousemove", e => {
+    if (tt.style.display !== "none") {
+      tt.style.left = (e.clientX + 12) + "px";
+      tt.style.top  = (e.clientY - 32) + "px";
+    }
+  });
+})();
 </script>
 </body>
 </html>
