@@ -237,7 +237,7 @@ function toggleBreakdown(i, e) { /* no-op — breakdown always visible */ }
 const C2F  = c  => Math.round(c * 9 / 5 + 32);
 const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 const esc  = s  => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
-const fmt  = (t, opts) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true, ...opts });
+const fmt  = (t, opts) => { const d = new Date(Date.parse(t)); return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true, ...opts }); };
 const fmtDate = t => new Date(t + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 
 function moonPhase(dateStr) {
@@ -283,26 +283,25 @@ function processDay(raw, di, group) {
   const date       = d.time[di];
   const sunriseStr = d.sunrise[di];
   const sunsetStr  = d.sunset[di];
-  const srMs       = sunriseStr ? new Date(sunriseStr).getTime() : null;
-  const ssMs       = sunsetStr  ? new Date(sunsetStr).getTime()  : null;
+  const srMs       = sunriseStr ? Date.parse(sunriseStr) : null;
+  const ssMs       = sunsetStr  ? Date.parse(sunsetStr)  : null;
 
   // ── Window definitions ────────────────────────────────────────────────────
-  // Setup window: midnight → sunrise (overnight conditions that allow inversion to form)
-  const setupStart = new Date(date + "T00:00").getTime();
-  const setupEnd   = srMs ?? new Date(date + "T07:00").getTime();
-  // Peak window: sunrise - 2h → sunrise + 1h (the actual shoot window)
-  const peakStart  = srMs ? srMs - 7200000 : new Date(date + "T05:00").getTime();
-  const peakEnd    = srMs ? srMs + 3600000 : new Date(date + "T08:00").getTime();
-  // Display window: 1am → sunrise + 2h
-  const dispStart  = new Date(date + "T01:00").getTime();
-  const dispEnd    = srMs ? srMs + 7200000 : new Date(date + "T09:00").getTime();
+  // Open-Meteo returns times as "YYYY-MM-DDTHH:MM" (no Z, local to requested timezone)
+  // Parse them directly as ms-since-epoch using Date.parse which treats no-Z as local
+  const setupStart = Date.parse(date + "T00:00");
+  const setupEnd   = srMs ?? Date.parse(date + "T07:00");
+  const peakStart  = srMs ? srMs - 7200000 : Date.parse(date + "T05:00");
+  const peakEnd    = srMs ? srMs + 3600000 : Date.parse(date + "T08:00");
+  const dispStart  = Date.parse(date + "T01:00");
+  const dispEnd    = srMs ? srMs + 7200000 : Date.parse(date + "T09:00");
 
   const setupIdxs = [], peakIdxs = [], dispIdxs = [];
-  times.forEach((t, i) => {
-    const ms = new Date(t).getTime();
-    if (ms >= setupStart && ms < setupEnd) setupIdxs.push(i);
-    if (ms >= peakStart  && ms < peakEnd)  peakIdxs.push(i);
-    if (ms >= dispStart  && ms <= dispEnd) dispIdxs.push(i);
+  times.forEach((t, idx) => {
+    const ms = Date.parse(t);
+    if (ms >= setupStart && ms < setupEnd) setupIdxs.push(idx);
+    if (ms >= peakStart  && ms < peakEnd)  peakIdxs.push(idx);
+    if (ms >= dispStart  && ms <= dispEnd) dispIdxs.push(idx);
   });
 
   // Fallback
@@ -388,19 +387,21 @@ function processDay(raw, di, group) {
   });
 
   // ── Hourly detail ─────────────────────────────────────────────────────────
-  const hourlyDetail = dispIdxs.map(i => {
-    const tMs    = new Date(times[i]).getTime();
-    const t2     = h.temperature_2m[i]       ?? 0;
-    const td2    = h.dewpoint_2m[i]           ?? 0;
-    const t850   = h.temperature_850hPa[i]    ?? 0;
+  const hourlyDetail = dispIdxs.map(idx => {
+    const tMs    = Date.parse(times[idx]);
+    const t2     = h.temperature_2m[idx]               ?? 0;
+    const td2    = h.dewpoint_2m[idx]                   ?? 0;
+    const t850   = h.temperature_850hPa[idx]            ?? 0;
+    const geo850 = h.geopotential_height_850hPa?.[idx]; // meters, actual altitude of 850mb surface
     const spread = Math.max(0, t2 - td2);
     const lFt    = Math.round(group.valley.elevFt + spread * 125 * 3.28084);
-    const lowCld = Math.round(h.cloudcover_low?.[i] ?? 0);
+    const lowCld = Math.round(h.cloudcover_low?.[idx] ?? 0);
     return {
       ms:        tMs,
       t2f:       C2F(t2),
       t850f:     C2F(t850),
-      wind:      Math.round(h.windspeed_10m[i] ?? 0),
+      geo850ft:  geo850 != null ? Math.round(geo850 * 3.28084) : null,
+      wind:      Math.round(h.windspeed_10m[idx] ?? 0),
       lowCloud:  lowCld,
       layerFt:   lFt,
       isSunrise: srMs != null && Math.abs(tMs - srMs) < 1800000,
@@ -408,14 +409,20 @@ function processDay(raw, di, group) {
     };
   });
 
+  // Actual altitude of 850mb surface near sunrise (for display in footnote)
+  const sr850ft = (() => {
+    const srH = hourlyDetail.find(h => h.isSunrise) ?? hourlyDetail[Math.floor(hourlyDetail.length / 2)];
+    return srH?.geo850ft ?? null;
+  })();
+
   const moon = moonPhase(date);
   const precipChance = d.precipitation_probability_max?.[di] ?? 0;
 
   // Valley temp at/near sunrise
   const srIdx = srMs != null && dispIdxs.length > 0
     ? dispIdxs.reduce((best, i) => {
-        const ms = new Date(times[i]).getTime();
-        return Math.abs(ms - srMs) < Math.abs(new Date(times[best]).getTime() - srMs) ? i : best;
+        const ms = Date.parse(times[i]);
+        return Math.abs(ms - srMs) < Math.abs(Date.parse(times[best]) - srMs) ? i : best;
       }, dispIdxs[0])
     : (dispIdxs[0] ?? workIdxs[0] ?? 0);
   const valleyTempF = C2F(h.temperature_2m[srIdx] ?? avgT2m);
@@ -441,7 +448,7 @@ function processDay(raw, di, group) {
     sThermal, sWind, sSky, sSatur,
     pThermal, pWind, pLowCloud, pSatur,
     avgLowCloud: Math.round(avgLowCloud),
-    valleyTempF, srCond,
+    valleyTempF, srCond, sr850ft,
     peakStatus, hourlyDetail, moon, precipChance,
   };
 }
@@ -480,20 +487,15 @@ function renderBestBet() {
   const bb = document.getElementById("bestBet");
   const fd = forecast[activeId];
   if (!fd?.days) { bb.className = "best-bet"; return; }
-
-  // Use same primary score logic as cards: peak for today/tomorrow, setup for later
   const nowMs = Date.now();
   const scored = fd.days.map(d => {
     const daysOut   = Math.round((new Date(d.date + "T12:00:00").getTime() - nowMs) / 86400000);
     const primScore = daysOut <= 1 ? d.peakScore : d.setupScore;
     const primLabel = daysOut <= 1 ? d.peakLabel : d.setupLabel;
-    const primColor = daysOut <= 1 ? d.peakColor : d.setupColor;
-    return { ...d, primScore, primLabel, primColor };
+    return { ...d, primScore, primLabel };
   }).filter(d => d.primScore >= 40).sort((a, b) => b.primScore - a.primScore);
-
   const best = scored[0];
   if (!best) { bb.className = "best-bet"; return; }
-
   const tier = best.primScore >= 70 ? "high" : best.primScore >= 55 ? "mid" : "low";
   const dt   = fmtDate(best.date);
   const sr   = best.sunriseStr ? fmt(best.sunriseStr) : "—";
@@ -619,8 +621,10 @@ function renderElevationDiagram(day, group) {
 function renderCard(day, i, group) {
   const today     = new Date().toDateString() === new Date(day.date + "T12:00:00").toDateString();
   const tomorrow  = new Date(Date.now() + 86400000).toDateString() === new Date(day.date + "T12:00:00").toDateString();
-  const isExp     = expandedDay === i;
-  const tierCls   = primScore >= 74 ? "score-vhigh" : primScore >= 58 ? "score-high" : "";
+  const isExp     = true;
+  const _daysOut  = Math.round((new Date(day.date + "T12:00:00").getTime() - Date.now()) / 86400000);
+  const _primScore = _daysOut <= 1 ? day.peakScore : day.setupScore;
+  const tierCls   = _primScore >= 74 ? "score-vhigh" : _primScore >= 58 ? "score-high" : "";
   const cardCls   = `day-card ${tierCls}${isExp ? " expanded" : ""}`;
   const tagHtml   = today ? `<span class="card-today">TODAY</span>` : tomorrow ? `<span class="card-today" style="background:rgba(90,172,110,0.15);color:var(--above)">TOMORROW</span>` : "";
 
@@ -760,7 +764,7 @@ function renderCard(day, i, group) {
 
   const isBreakdown = true; // always shown
   const showHourly  = isExp;
-  const breakdownHtml = isBreakdown ? `<div class="breakdown-panel">
+  const breakdownHtml = isBreakdown ? `<div class="breakdown-panel" onclick="event.stopPropagation()">
     <div class="breakdown-title">Setup Score · ${day.setupScore}/100 · overnight conditions</div>
     ${breakdownRow("Warm Air Lid",    "s-thermal", day.sThermal, 40)}
     ${breakdownRow("Overnight Wind",  "s-wind",    day.sWind,    25)}
@@ -795,7 +799,7 @@ function renderCard(day, i, group) {
   // Hourly detail
   const hourlyHtml = showHourly ? renderHourly(day, group) : "";
 
-  return `<div class="${cardCls}" onclick="toggleDay(${i})">
+  return `<div class="${cardCls}">
     <div class="card-head">
       <div class="card-date">${fmtDate(day.date)} ${tagHtml}</div>
       <div class="card-astro">🌅 ${srStr} &nbsp; 🌇 ${ssStr} &nbsp; ${day.moon.emoji} ${day.moon.pct}%&nbsp;<span style="color:rgba(255,255,255,0.15)" title="${day.moon.name}">${day.moon.name}</span>${precipStr}</div>
@@ -879,7 +883,7 @@ function renderHourly(day, group) {
       <span>Time</span><span>Surf</span><span>850mb</span><span>Wind</span><span>LowCld</span><span>CldTop</span>
     </div>
     ${rows}
-    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise · 850mb = temp at ~5,500 ft (warmer than Surf = inversion) · CldTop = estimated cloud top that hour</div>
+    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise · 850mb = temp at the 850mb pressure level${day.sr850ft ? ` (~${day.sr850ft.toLocaleString()} ft at sunrise — varies with air temp)` : " (actual altitude varies with air temp)"} · warmer than Surf = inversion · CldTop = estimated cloud top that hour</div>
   </div>`;
 }
 
