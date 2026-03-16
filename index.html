@@ -173,8 +173,8 @@
 <div id="forecast"><div class="state-msg loading">Fetching forecast…</div></div>
 <div class="footer">
   Inversion score (0–100): Warm Air Lid strength (40 pts) + calm overnight wind (25 pts) + clear overnight sky for radiative cooling (20 pts) + surface near dewpoint / fog likely (15 pts) + morning low cloud already present in valley (up to +10 bonus) ·
-  Cloud ceiling (est.) = valley elevation + LCL cloud base height (derived from temperature–dewpoint spread) ·
-  "Above ceiling" = peak elevation is higher than the estimated cloud top — you'd be on a ridge looking down at the cloud sea ·
+  Cloud top (est.) = valley elevation + LCL cloud base height (derived from temperature–dewpoint spread) ·
+  "Above cloud top" = peak elevation is higher than the estimated cloud top — you'd be on a ridge looking down at the cloud sea ·
   "Warm air lid" = air aloft is warmer than valley surface, trapping cold air and cloud below ridge level ·
   Best window: ~30–90 min around sunrise as the inversion layer peaks then gradually lifts ·
   Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo ECMWF IFS</a>
@@ -426,6 +426,106 @@ function renderForecast() {
   el.innerHTML = `<div class="forecast-row">${fd.days.map((day, i) => renderCard(day, i, g)).join("")}</div>`;
 }
 
+function renderElevationDiagram(day, group) {
+  const W = 246, H = 94;
+  const padL = 8, padR = 32, padT = 18, padB = 14;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const valleyFt = group.valley.elevFt;
+  const peakMax  = Math.max(...group.peaks.map(p => p.elevFt));
+  const cloudTop = day.layerTopFt ?? (valleyFt + 800);
+
+  // Y range: valley floor to ~18% above tallest peak
+  const yMin   = valleyFt;
+  const yMax   = peakMax + (peakMax - valleyFt) * 0.18;
+  const yRange = yMax - yMin || 1;
+
+  const fy  = elev => padT + plotH - ((Math.min(elev, yMax) - yMin) / yRange) * plotH;
+  const cloudY  = fy(cloudTop);
+  const valleyY = padT + plotH;   // always at bottom of plot
+
+  // Spread peaks evenly across plot width
+  const n     = group.peaks.length;
+  const peakXs = group.peaks.map((_, i) => padL + (plotW / (n + 1)) * (i + 1));
+
+  const parts = [];
+
+  // ── Cloud fill band (valley floor → cloud top) ──
+  // Wavy top edge using a cubic bezier path for a cloud-like feel
+  const bTop  = Math.max(padT + 2, cloudY);
+  const bH    = valleyY - bTop;
+  const waveH = 3; // amplitude of the wave
+  const wX1   = padL + plotW * 0.25, wX2 = padL + plotW * 0.5,
+        wX3   = padL + plotW * 0.75;
+  const wavePath = `M${padL},${bTop}
+    C${wX1 - 10},${bTop - waveH} ${wX1 + 10},${bTop + waveH} ${wX2},${bTop}
+    C${wX2 + plotW*0.1},${bTop - waveH} ${wX3 + 10},${bTop + waveH} ${padL + plotW},${bTop}
+    L${padL + plotW},${valleyY} L${padL},${valleyY} Z`;
+  parts.push(`<path d="${wavePath}" fill="#4fa3e0" opacity="0.09"/>`);
+
+  // ── Cloud top dashed line ──
+  parts.push(`<line x1="${padL}" x2="${padL + plotW}" y1="${cloudY}" y2="${cloudY}"
+    stroke="#4fa3e0" stroke-width="1" stroke-dasharray="3,2" opacity="0.45"/>`);
+
+  // ── Y-axis labels (right side) ──
+  const cloudK  = (cloudTop / 1000).toFixed(1) + "k";
+  const valleyK = (valleyFt / 1000).toFixed(1) + "k";
+  parts.push(`<text x="${padL + plotW + 3}" y="${cloudY}" font-size="7" font-family="var(--mono)"
+    fill="rgba(79,163,224,0.55)" dominant-baseline="middle">${cloudK}</text>`);
+  parts.push(`<text x="${padL + plotW + 3}" y="${valleyY - 1}" font-size="7" font-family="var(--mono)"
+    fill="rgba(255,255,255,0.2)" dominant-baseline="auto">${valleyK}</text>`);
+
+  // ── "cloud top" label on the dashed line ──
+  parts.push(`<text x="${padL + 3}" y="${cloudY - 3}" font-size="7" font-family="var(--mono)"
+    fill="rgba(79,163,224,0.4)">cloud top</text>`);
+
+  // ── Valley floor line ──
+  parts.push(`<line x1="${padL}" x2="${padL + plotW}" y1="${valleyY}" y2="${valleyY}"
+    stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`);
+  parts.push(`<text x="${padL + 3}" y="${H - 2}" font-size="7" font-family="var(--mono)"
+    fill="rgba(255,255,255,0.18)">valley</text>`);
+
+  // ── Peak triangles ──
+  const ABOVE = "#5aac6e", EDGE = "#c4aa4a", BELOW = "rgba(61,78,94,0.8)";
+  let bestAboveX = null, bestAboveY = null;
+
+  group.peaks.forEach((p, i) => {
+    const px  = peakXs[i];
+    const py  = fy(p.elevFt);
+    const ps  = day.peakStatus[i];
+    const col = ps?.status === "above" ? ABOVE : ps?.status === "edge" ? EDGE : BELOW;
+    const tw  = 9, th = 8;
+
+    // Elevation label above triangle
+    const elevK = (p.elevFt / 1000).toFixed(1) + "k";
+    parts.push(`<text x="${px}" y="${py - th - 2}" text-anchor="middle" font-size="7"
+      font-family="var(--mono)" fill="${col}" opacity="0.9">${elevK}</text>`);
+
+    // Triangle
+    parts.push(`<polygon points="${px},${py} ${px - tw/2},${py + th} ${px + tw/2},${py + th}"
+      fill="${col}" opacity="0.85"/>`);
+
+    // Track highest above-cloud peak for camera marker
+    if (ps?.status === "above" && (bestAboveY === null || py < bestAboveY)) {
+      bestAboveX = px; bestAboveY = py;
+    }
+  });
+
+  // ── Camera marker on highest above-cloud peak ──
+  if (bestAboveX !== null) {
+    parts.push(`<text x="${bestAboveX}" y="${bestAboveY - 18}" text-anchor="middle"
+      font-size="11" opacity="0.7">📷</text>`);
+  }
+
+  return `<div style="padding:6px 13px 6px;border-bottom:1px solid var(--border)">
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}"
+      style="display:block;overflow:visible">
+      ${parts.join("\n      ")}
+    </svg>
+  </div>`;
+}
+
 function renderCard(day, i, group) {
   const today     = new Date().toDateString() === new Date(day.date + "T12:00:00").toDateString();
   const tomorrow  = new Date(Date.now() + 86400000).toDateString() === new Date(day.date + "T12:00:00").toDateString();
@@ -443,17 +543,17 @@ function renderCard(day, i, group) {
     ? `<span style="color:var(--score-high)">Warm air lid: ${Math.round(day.invDelta * 9/5)}°F warmer aloft ✓</span>`
     : `<span style="color:var(--dim)">No warm air lid detected</span>`;
 
-  // Peaks — cloud ceiling shown as reference row above peaks
+  // Peaks — cloud top shown as reference row above peaks
   const peakRows = `
     <div style="font-size:9px;font-family:var(--mono);color:rgba(255,255,255,0.18);display:flex;justify-content:space-between;padding:0 0 5px 0;border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:3px">
       <span>PEAK</span>
       <span style="color:rgba(255,255,255,0.12);font-size:8px">ELEV</span>
-      <span>ABOVE CEILING</span>
+      <span>ABOVE CLOUD TOP</span>
     </div>
     <div class="peak-row" style="opacity:0.55;margin-bottom:2px">
-      <span class="peak-row-name" style="font-style:italic">☁ cloud ceiling</span>
+      <span class="peak-row-name" style="font-style:italic">☁ cloud top</span>
       <span class="peak-row-elev">${day.layerTopFt ? day.layerTopFt.toLocaleString() + " ft" : "—"}</span>
-      <span class="peak-row-status" style="color:var(--dim);font-weight:400">— ceiling —</span>
+      <span class="peak-row-status" style="color:var(--dim);font-weight:400">— top —</span>
     </div>
     ${group.peaks.map((p, pi) => {
       const ps   = day.peakStatus[pi];
@@ -502,10 +602,11 @@ function renderCard(day, i, group) {
       <div class="score-num" style="color:${day.color}">${day.score}</div>
       <div class="score-right">
         <div class="score-label" style="color:${day.color}">${day.label}</div>
-        <div class="score-layer">Cloud ceiling (est.): ${layerStr}<br>${invStr}</div>
+        <div class="score-layer">Cloud top (est.): ${layerStr}<br>${invStr}</div>
         <div class="score-bar-track"><div class="score-bar-fill" style="width:${day.score}%;background:${day.color}"></div></div>
       </div>
     </div>
+    ${renderElevationDiagram(day, group)}
     <div class="peaks-block">${peakRows}</div>
     <div class="cond-block">
       <div class="cond-item" title="Average overnight wind speed. Under 5 mph is ideal — calm air lets cold air pool in the valley."><div class="cond-val ${wColor}">${day.avgWind}</div><div class="cond-label">Wind mph</div></div>
