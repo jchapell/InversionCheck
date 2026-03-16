@@ -142,9 +142,8 @@
   .breakdown-factor-score { font-size: 9px; font-family: var(--mono); color: var(--dim); }
   .breakdown-mini-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
   .breakdown-mini-fill  { height: 100%; border-radius: 2px; }
-  .breakdown-factor-desc { font-size: 9px; font-family: var(--mono); color: var(--dim); line-height: 1.5; padding-left: 2px; }
+  .breakdown-factor-desc { font-size: 9px; font-family: var(--mono); color: #94a3b8; line-height: 1.5; padding-left: 2px; }
   .breakdown-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 10px 0; }
-  .subscore-tap-hint { font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.2); text-align: center; padding: 4px 0 2px; letter-spacing: 0.04em; }
 
   /* Instant custom tooltip (replaces browser title delay) */
   #inv-tooltip { position: fixed; background: #1c2535; border: 1px solid rgba(255,255,255,0.12); color: var(--text); font-size: 10px; font-family: var(--mono); padding: 5px 10px; border-radius: 5px; pointer-events: none; z-index: 300; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: none; }
@@ -231,20 +230,8 @@ let groups            = [];
 let activeId          = null;
 let forecast          = {};   // id → { days } | { error } | null (loading)
 let expandedDay       = null;
-let expandedBreakdown = new Set(); // card indices with score breakdown open
 
-function toggleBreakdown(i, e) {
-  e.stopPropagation();
-  if (expandedBreakdown.has(i)) {
-    // Breakdown is open — close it, restore hourly if card was expanded
-    expandedBreakdown.delete(i);
-  } else {
-    // Open breakdown — card must be expanded, hide hourly
-    expandedDay = i;           // ensure card is "expanded" so it stays open
-    expandedBreakdown.add(i);
-  }
-  renderForecast();
-}
+function toggleBreakdown(i, e) { /* no-op — breakdown always visible */ }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const C2F  = c  => Math.round(c * 9 / 5 + 32);
@@ -493,18 +480,30 @@ function renderBestBet() {
   const bb = document.getElementById("bestBet");
   const fd = forecast[activeId];
   if (!fd?.days) { bb.className = "best-bet"; return; }
-  const best = [...fd.days].filter(d => d.score >= 40).sort((a, b) => b.score - a.score)[0];
+
+  // Use same primary score logic as cards: peak for today/tomorrow, setup for later
+  const nowMs = Date.now();
+  const scored = fd.days.map(d => {
+    const daysOut   = Math.round((new Date(d.date + "T12:00:00").getTime() - nowMs) / 86400000);
+    const primScore = daysOut <= 1 ? d.peakScore : d.setupScore;
+    const primLabel = daysOut <= 1 ? d.peakLabel : d.setupLabel;
+    const primColor = daysOut <= 1 ? d.peakColor : d.setupColor;
+    return { ...d, primScore, primLabel, primColor };
+  }).filter(d => d.primScore >= 40).sort((a, b) => b.primScore - a.primScore);
+
+  const best = scored[0];
   if (!best) { bb.className = "best-bet"; return; }
-  const tier = best.score >= 70 ? "high" : best.score >= 55 ? "mid" : "low";
+
+  const tier = best.primScore >= 70 ? "high" : best.primScore >= 55 ? "mid" : "low";
   const dt   = fmtDate(best.date);
   const sr   = best.sunriseStr ? fmt(best.sunriseStr) : "—";
   const peaksUp = allGroups().find(x => x.id === activeId)?.peaks
     .filter((p, i) => best.peakStatus[i]?.status === "above").map(p => p.name.split(" ")[0]).join(", ");
-  const layerStr = best.layerTopFt ? `layer ~${best.layerTopFt.toLocaleString()} ft` : "";
+  const layerStr = best.layerTopFt ? `cloud top ~${best.layerTopFt.toLocaleString()} ft` : "";
   const peaksStr = peaksUp ? ` · ${peaksUp} above clouds` : "";
   bb.className = `best-bet show ${tier}`;
   bb.innerHTML = `<span class="best-bet-icon">🎯</span>
-    <span><strong>Best window: ${dt}</strong> · Score ${best.score} (${best.label}) · ${sr} sunrise · ${layerStr}${peaksStr}</span>`;
+    <span><strong>Best window: ${dt}</strong> · Score ${best.primScore} (${best.primLabel}) · ${sr} sunrise · ${layerStr}${peaksStr}</span>`;
 }
 
 function renderForecast() {
@@ -621,7 +620,7 @@ function renderCard(day, i, group) {
   const today     = new Date().toDateString() === new Date(day.date + "T12:00:00").toDateString();
   const tomorrow  = new Date(Date.now() + 86400000).toDateString() === new Date(day.date + "T12:00:00").toDateString();
   const isExp     = expandedDay === i;
-  const tierCls   = day.score >= 74 ? "score-vhigh" : day.score >= 58 ? "score-high" : "";
+  const tierCls   = primScore >= 74 ? "score-vhigh" : primScore >= 58 ? "score-high" : "";
   const cardCls   = `day-card ${tierCls}${isExp ? " expanded" : ""}`;
   const tagHtml   = today ? `<span class="card-today">TODAY</span>` : tomorrow ? `<span class="card-today" style="background:rgba(90,172,110,0.15);color:var(--above)">TOMORROW</span>` : "";
 
@@ -759,10 +758,9 @@ function renderCard(day, i, group) {
     </div>`;
   }
 
-  const isBreakdown = expandedBreakdown.has(i);
-  // Hourly shows when card is expanded but breakdown is not open
-  const showHourly  = isExp && !isBreakdown;
-  const breakdownHtml = isBreakdown ? `<div class="breakdown-panel" onclick="event.stopPropagation()">
+  const isBreakdown = true; // always shown
+  const showHourly  = isExp;
+  const breakdownHtml = isBreakdown ? `<div class="breakdown-panel">
     <div class="breakdown-title">Setup Score · ${day.setupScore}/100 · overnight conditions</div>
     ${breakdownRow("Warm Air Lid",    "s-thermal", day.sThermal, 40)}
     ${breakdownRow("Overnight Wind",  "s-wind",    day.sWind,    25)}
@@ -829,8 +827,7 @@ function renderCard(day, i, group) {
       <div class="cond-item" data-tip="Temperature minus dewpoint at sunrise. Under 5° = nearly saturated."><div class="cond-val ${dColor}">${sc.tdSpread}°</div><div class="cond-label">T–Dew °F</div></div>
       <div class="cond-item" data-tip="Warm air lid at sunrise. ✓ = 850mb warmer than surface."><div class="cond-val ${iColor}">${sc.invOk ? "✓" : "✗"}</div><div class="cond-label">Warm Lid</div></div>
     </div>
-    <div class="subscore-section" onclick="toggleBreakdown(${i}, event)">
-      <div class="subscore-tap-hint">${isBreakdown ? "▲ tap to show hourly detail" : "▼ tap for score breakdown"}</div>
+    <div class="subscore-section" onclick="event.stopPropagation()">
       <div style="display:flex;gap:8px;margin-bottom:2px">
         <div style="flex:1">
           <div class="subscore-row">${setupBars}</div>
@@ -887,16 +884,7 @@ function renderHourly(day, group) {
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function toggleDay(i) {
-  if (expandedBreakdown.has(i)) {
-    // Breakdown is showing — tap card body closes breakdown, shows hourly
-    expandedBreakdown.delete(i);
-    expandedDay = i;
-  } else {
-    expandedDay = expandedDay === i ? null : i;
-  }
-  renderForecast();
-}
+function toggleDay(i) { expandedDay = expandedDay === i ? null : i; renderForecast(); }
 
 function selectGroup(id) {
   activeId = id; expandedDay = null; render();
