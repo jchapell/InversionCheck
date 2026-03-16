@@ -89,9 +89,9 @@
   /* Peaks */
   .peaks-block { padding: 9px 13px; border-bottom: 1px solid var(--border); }
   .peak-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
-  .peak-row-name { font-size: 11px; font-family: var(--mono); color: var(--dim); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .peak-row-name { font-size: 11px; font-family: var(--mono); color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .peak-row-elev { font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.18); width: 58px; text-align: right; flex-shrink: 0; }
-  .peak-row-status { font-size: 10px; font-family: var(--mono); font-weight: 600; width: 64px; text-align: right; flex-shrink: 0; }
+  .peak-row-status { font-size: 10px; font-family: var(--mono); font-weight: 600; width: 72px; text-align: right; flex-shrink: 0; white-space: nowrap; }
   .peak-row-status.above { color: var(--above); }
   .peak-row-status.edge  { color: var(--edge); }
   .peak-row-status.below { color: var(--below); }
@@ -172,10 +172,11 @@
 <div class="best-bet" id="bestBet"></div>
 <div id="forecast"><div class="state-msg loading">Fetching forecast…</div></div>
 <div class="footer">
-  Inversion score (0–100) = thermal inversion strength (T_surface vs T_850hPa, 40 pts) + overnight calm wind (25 pts) + clear overnight sky / radiative cooling (20 pts) + surface saturation / dewpoint spread (15 pts) ·
-  Cloud layer top = valley elevation + LCL: 410 × (T – Td)°C ft above ground ·
-  "Above clouds" = estimated layer top is below peak elevation ·
-  Best window: ~30–90 min around sunrise as inversion peaks then lifts ·
+  Inversion score (0–100): Warm Air Lid strength (40 pts) + calm overnight wind (25 pts) + clear overnight sky for radiative cooling (20 pts) + surface near dewpoint / fog likely (15 pts) + morning low cloud already present in valley (up to +10 bonus) ·
+  Cloud ceiling (est.) = valley elevation + LCL cloud base height (derived from temperature–dewpoint spread) ·
+  "Above ceiling" = peak elevation is higher than the estimated cloud top — you'd be on a ridge looking down at the cloud sea ·
+  "Warm air lid" = air aloft is warmer than valley surface, trapping cold air and cloud below ridge level ·
+  Best window: ~30–90 min around sunrise as the inversion layer peaks then gradually lifts ·
   Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo ECMWF IFS</a>
 </div>
 
@@ -233,7 +234,7 @@ function allGroups() { return groups.length ? groups : DEFAULT_GROUPS; }
 // ─── Open-Meteo fetch ─────────────────────────────────────────────────────────
 async function fetchOMData(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&hourly=temperature_2m,dewpoint_2m,windspeed_10m,cloudcover,temperature_850hPa,geopotential_height_850hPa` +
+    `&hourly=temperature_2m,dewpoint_2m,windspeed_10m,cloudcover,cloudcover_low,temperature_850hPa,geopotential_height_850hPa` +
     `&daily=sunrise,sunset,weathercode,precipitation_probability_max` +
     `&temperature_unit=celsius&wind_speed_unit=mph&forecast_days=7&timezone=auto`;
   const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 14000));
@@ -276,21 +277,28 @@ function processDay(raw, di, group) {
              layerTopFt: null, peakStatus: [], hourlyDetail: [], moon: moonPhase(date) };
   }
 
-  const get = key => workIdxs.map(i => h[key][i] ?? 0);
-  const avgT2m   = mean(get("temperature_2m"));
-  const avgTd    = mean(get("dewpoint_2m"));
-  const avgWind  = mean(get("windspeed_10m"));
-  const avgCloud = mean(get("cloudcover"));
-  const avgT850  = mean(get("temperature_850hPa"));
+  const get = key => workIdxs.map(i => h[key]?.[i] ?? 0);
+  const avgT2m    = mean(get("temperature_2m"));
+  const avgTd     = mean(get("dewpoint_2m"));
+  const avgWind   = mean(get("windspeed_10m"));
+  const avgCloud  = mean(get("cloudcover"));
+  const avgT850   = mean(get("temperature_850hPa"));
+
+  // Low cloud cover (~0–6,500 ft) near sunrise — direct evidence of valley fog/cloud forming
+  // Use dispIdxs (morning window) for this signal since we want cloud already present at dawn
+  const morningIdxs = dispIdxs.length > 0 ? dispIdxs : workIdxs;
+  const avgLowCloud = mean(morningIdxs.map(i => h.cloudcover_low?.[i] ?? 0));
 
   // ── Scoring ──────────────────────────────────────────────────────────────
-  const invDelta     = avgT850 - avgT2m;                           // +ve = inverted
+  const invDelta     = avgT850 - avgT2m;
   const thermalScore = Math.round(Math.min(40, Math.max(0, invDelta * 6)));
   const windScore    = avgWind < 4 ? 25 : avgWind < 8 ? 17 : avgWind < 13 ? 7 : 0;
   const cloudScore   = avgCloud < 15 ? 20 : avgCloud < 35 ? 12 : avgCloud < 55 ? 5 : 0;
-  const tdSpread     = avgT2m - avgTd;                             // °C, smaller = more saturated
+  const tdSpread     = avgT2m - avgTd;
   const dpScore      = tdSpread < 2 ? 15 : tdSpread < 4 ? 10 : tdSpread < 7 ? 5 : 0;
-  const score        = thermalScore + windScore + cloudScore + dpScore;
+  // Low cloud bonus: morning low cloud in the valley = inversion already forming (up to +10 bonus)
+  const lowCloudBonus = avgLowCloud > 60 ? 10 : avgLowCloud > 35 ? 6 : avgLowCloud > 15 ? 2 : 0;
+  const score        = thermalScore + windScore + cloudScore + dpScore + lowCloudBonus;
 
   // ── Layer top (LCL) ──────────────────────────────────────────────────────
   // Use minimum spread during scoring window for best-case cloud base
@@ -339,12 +347,23 @@ function processDay(raw, di, group) {
   const moon = moonPhase(date);
   const precipChance = d.precipitation_probability_max?.[di] ?? 0;
 
+  // Valley temp at/near sunrise for display — use first dispIdx hour near sunrise
+  const srIdx = srMs != null
+    ? dispIdxs.reduce((best, i) => {
+        const ms = new Date(times[i]).getTime();
+        return Math.abs(ms - srMs) < Math.abs(new Date(times[best]).getTime() - srMs) ? i : best;
+      }, dispIdxs[0] ?? workIdxs[0] ?? 0)
+    : (dispIdxs[0] ?? workIdxs[0] ?? 0);
+  const valleyTempF = C2F(h.temperature_2m[srIdx] ?? avgT2m);
+
   return {
     date, sunriseStr, sunsetStr, score, label, color,
     layerTopFt, invDelta: +invDelta.toFixed(1), invConfirmed: invDelta > 0,
     avgWind: Math.round(avgWind), avgCloud: Math.round(avgCloud),
     tdSpreadF: Math.round(tdSpread * 9 / 5),
-    thermalScore, windScore, cloudScore, dpScore,
+    thermalScore, windScore, cloudScore, dpScore, lowCloudBonus,
+    avgLowCloud: Math.round(avgLowCloud),
+    valleyTempF,
     peakStatus, hourlyDetail, moon, precipChance,
   };
 }
@@ -421,29 +440,41 @@ function renderCard(day, i, group) {
 
   const layerStr = day.layerTopFt ? `~${day.layerTopFt.toLocaleString()} ft` : "—";
   const invStr   = day.invConfirmed
-    ? `<span style="color:var(--score-high)">+${day.invDelta}°C inversion confirmed</span>`
-    : `<span style="color:var(--dim)">no inversion at 850mb</span>`;
+    ? `<span style="color:var(--score-high)">Warm air lid: ${Math.round(day.invDelta * 9/5)}°F warmer aloft ✓</span>`
+    : `<span style="color:var(--dim)">No warm air lid detected</span>`;
 
-  // Peaks
-  const peakRows = group.peaks.map((p, pi) => {
-    const ps   = day.peakStatus[pi];
-    const diff = ps?.diff ?? 0;
-    const sc   = ps?.status === "above" ? "above" : ps?.status === "edge" ? "edge" : "below";
-    const lbl  = ps?.status === "above" ? `↑ +${Math.abs(diff).toLocaleString()} ft`
-               : ps?.status === "edge"  ? `~ ±${Math.abs(diff).toLocaleString()} ft`
-               :                          `↓ ${Math.abs(diff).toLocaleString()} ft`;
-    return `<div class="peak-row">
-      <span class="peak-row-name">${esc(p.name)}</span>
-      <span class="peak-row-elev">${p.elevFt.toLocaleString()} ft</span>
-      <span class="peak-row-status ${sc}">${lbl}</span>
-    </div>`;
-  }).join("");
+  // Peaks — cloud ceiling shown as reference row above peaks
+  const peakRows = `
+    <div style="font-size:9px;font-family:var(--mono);color:rgba(255,255,255,0.18);display:flex;justify-content:space-between;padding:0 0 5px 0;border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:3px">
+      <span>PEAK</span>
+      <span style="color:rgba(255,255,255,0.12);font-size:8px">ELEV</span>
+      <span>ABOVE CEILING</span>
+    </div>
+    <div class="peak-row" style="opacity:0.55;margin-bottom:2px">
+      <span class="peak-row-name" style="font-style:italic">☁ cloud ceiling</span>
+      <span class="peak-row-elev">${day.layerTopFt ? day.layerTopFt.toLocaleString() + " ft" : "—"}</span>
+      <span class="peak-row-status" style="color:var(--dim);font-weight:400">— ceiling —</span>
+    </div>
+    ${group.peaks.map((p, pi) => {
+      const ps   = day.peakStatus[pi];
+      const diff = ps?.diff ?? 0;
+      const sc   = ps?.status === "above" ? "above" : ps?.status === "edge" ? "edge" : "below";
+      const lbl  = ps?.status === "above" ? `↑ +${Math.abs(diff).toLocaleString()}ft`
+                 : ps?.status === "edge"  ? `~ edge`
+                 :                          `↓ in cloud`;
+      return `<div class="peak-row">
+        <span class="peak-row-name">▲ ${esc(p.name)}</span>
+        <span class="peak-row-elev">${p.elevFt.toLocaleString()} ft</span>
+        <span class="peak-row-status ${sc}">${lbl}</span>
+      </div>`;
+    }).join("")}`;
 
   // Conditions
-  const wColor = day.avgWind  <= 5  ? "good" : day.avgWind  <= 11 ? "ok" : "poor";
-  const cColor = day.avgCloud <= 20 ? "good" : day.avgCloud <= 45 ? "ok" : "poor";
-  const dColor = day.tdSpreadF <= 5 ? "good" : day.tdSpreadF <= 9 ? "ok" : "poor";
-  const iColor = day.invConfirmed   ? "good" : "poor";
+  const wColor  = day.avgWind     <= 5  ? "good" : day.avgWind  <= 11 ? "ok" : "poor";
+  const cColor  = day.avgCloud    <= 20 ? "good" : day.avgCloud  <= 45 ? "ok" : "poor";
+  const lcColor = day.avgLowCloud >= 50 ? "good" : day.avgLowCloud >= 20 ? "ok" : "poor";
+  const dColor  = day.tdSpreadF   <= 5  ? "good" : day.tdSpreadF <= 9  ? "ok" : "poor";
+  const iColor  = day.invConfirmed      ? "good" : "poor";
 
   // Sub-score bars
   const barH = (v, max) => Math.max(2, Math.round((v / max) * 28));
@@ -452,10 +483,11 @@ function renderCard(day, i, group) {
     return pct > 0.65 ? "var(--above)" : pct > 0.35 ? "var(--edge)" : "var(--dim)";
   };
   const bars = [
-    { v: day.thermalScore, max: 40, label: "Therm" },
-    { v: day.windScore,    max: 25, label: "Wind"  },
-    { v: day.cloudScore,   max: 20, label: "Sky"   },
-    { v: day.dpScore,      max: 15, label: "Satur" },
+    { v: day.thermalScore,   max: 40, label: "Thermal" },
+    { v: day.windScore,      max: 25, label: "Wind"    },
+    { v: day.cloudScore,     max: 20, label: "Sky"     },
+    { v: day.dpScore,        max: 15, label: "Satur"   },
+    { v: day.lowCloudBonus,  max: 10, label: "Low Cloud"},
   ].map(b => `<div class="subscore-bar" style="height:${barH(b.v,b.max)}px;background:${barColor(b.v,b.max)};flex:1" title="${b.label}: ${b.v}/${b.max}"></div>`).join("");
 
   // Hourly detail
@@ -470,16 +502,16 @@ function renderCard(day, i, group) {
       <div class="score-num" style="color:${day.color}">${day.score}</div>
       <div class="score-right">
         <div class="score-label" style="color:${day.color}">${day.label}</div>
-        <div class="score-layer">Layer: ${layerStr}<br>${invStr}</div>
+        <div class="score-layer">Cloud ceiling (est.): ${layerStr}<br>${invStr}</div>
         <div class="score-bar-track"><div class="score-bar-fill" style="width:${day.score}%;background:${day.color}"></div></div>
       </div>
     </div>
     <div class="peaks-block">${peakRows}</div>
     <div class="cond-block">
-      <div class="cond-item"><div class="cond-val ${wColor}">${day.avgWind}</div><div class="cond-label">Wind mph</div></div>
-      <div class="cond-item"><div class="cond-val ${cColor}">${day.avgCloud}%</div><div class="cond-label">Overnight ☁</div></div>
-      <div class="cond-item"><div class="cond-val ${dColor}">${day.tdSpreadF}°</div><div class="cond-label">T–Td °F</div></div>
-      <div class="cond-item"><div class="cond-val ${iColor}">${day.invConfirmed ? "✓" : "✗"}</div><div class="cond-label">850mb Inv</div></div>
+      <div class="cond-item" title="Average overnight wind speed. Under 5 mph is ideal — calm air lets cold air pool in the valley."><div class="cond-val ${wColor}">${day.avgWind}</div><div class="cond-label">Wind mph</div></div>
+      <div class="cond-item" title="Low cloud cover (below ~6,500 ft) in the morning near sunrise. High % means valley fog/cloud is already forming — a strong direct sign of inversion."><div class="cond-val ${lcColor}">${day.avgLowCloud}%</div><div class="cond-label">Low Cloud</div></div>
+      <div class="cond-item" title="Temperature minus dewpoint (°F). Under 5° means the air is nearly saturated and fog or cloud will form easily."><div class="cond-val ${dColor}">${day.tdSpreadF}°</div><div class="cond-label">T–Dew °F</div></div>
+      <div class="cond-item" title="Warm Air Lid: warm air sitting above the cold valley air acts as a cap, trapping the cloud layer below ridge level. This is the key ingredient for a valley inversion."><div class="cond-val ${iColor}">${day.invConfirmed ? "✓" : "✗"}</div><div class="cond-label">Warm Lid</div></div>
     </div>
     <div class="subscore-block" title="Sub-scores: Thermal · Wind · Sky · Saturation">${bars}</div>
     ${hourlyHtml}
@@ -497,7 +529,7 @@ function renderHourly(day, group) {
     const invPct  = Math.round(Math.max(0, h.invDeltaC) / maxDelta * 100);
     const invColor = invPct > 65 ? "var(--score-high)" : invPct > 30 ? "var(--score-mid)" : "var(--dim)";
     const invBadge = h.invDeltaC > 0
-      ? `<span class="inv-badge" style="background:${invColor}22;color:${invColor}">+${h.invDeltaC}°</span>`
+      ? `<span class="inv-badge" style="background:${invColor}22;color:${invColor}">+${Math.round(h.invDeltaC * 9/5)}°F</span>`
       : `<span style="color:var(--dim);font-size:9px">—</span>`;
     const peakStr  = h.peaksAbove > 0
       ? `<span style="color:var(--above)">${h.peaksAbove}/${group.peaks.length} ↑</span>`
@@ -507,7 +539,7 @@ function renderHourly(day, group) {
     return `<div class="${rowCls}">
       <span style="color:var(--dim)">${timeStr}${isSrMark}</span>
       <span>${h.t2f}°F</span>
-      <span style="color:var(--dim)">${h.t850f}°</span>
+      <span style="color:var(--dim)">${h.t850f}°F</span>
       ${invBadge}
       <span style="color:${h.wind <= 8 ? "var(--above)" : "var(--dim)"}">${h.wind}</span>
       ${peakStr}
@@ -519,7 +551,7 @@ function renderHourly(day, group) {
       <span>Time</span><span>Surf</span><span>850mb</span><span>ΔInv</span><span>Wind</span><span>Peaks↑</span>
     </div>
     ${rows}
-    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise row · ΔInv = 850mb minus surface (°C, positive = inverted)</div>
+    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise · ΔInv = how much warmer 850mb is than surface (°F) — positive means cold air is trapped below</div>
   </div>`;
 }
 
