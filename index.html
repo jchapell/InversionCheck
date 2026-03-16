@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inversion Forecast · Photography Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14; --card: #131920; --card2: #1a2130; --text: #dce8f5; --dim: #6b7a8d;
+    --accent: #4fa3e0; --mono: 'JetBrains Mono', monospace; --sans: 'DM Sans', sans-serif;
+    --border: rgba(255,255,255,0.06);
+    --score-none:  #4a5568;
+    --score-low:   #718096;
+    --score-mid:   #c4aa4a;
+    --score-high:  #d4834a;
+    --score-vhigh: #c94f4f;
+    --above: #5aac6e;
+    --edge:  #c4aa4a;
+    --below: #3d4e5e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh;
+         background-image: radial-gradient(ellipse at 20% 0%, rgba(79,163,224,0.04) 0%, transparent 60%); }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+  /* ── Header ── */
+  .header { padding: 18px 24px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .header-left { flex: 1 1 auto; }
+  .header h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.03em; display: flex; align-items: center; gap: 8px; }
+  .header h1 .icon { font-size: 18px; }
+  .header .sub { font-size: 10px; font-family: var(--mono); color: var(--dim); margin-top: 3px; letter-spacing: 0.02em; }
+  .btn { padding: 6px 14px; font-size: 11px; font-family: var(--mono); border-radius: 6px; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-ghost { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--dim); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .btn-accent { background: rgba(79,163,224,0.15); border: 1px solid rgba(79,163,224,0.3); color: var(--accent); }
+  .btn-accent:hover { background: rgba(79,163,224,0.25); }
+
+  /* ── Group bar ── */
+  .group-bar { padding: 10px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .group-chip { padding: 4px 12px; font-size: 11px; font-family: var(--mono); border-radius: 4px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--dim); transition: all 0.15s; white-space: nowrap; }
+  .group-chip.active { background: rgba(79,163,224,0.1); border-color: rgba(79,163,224,0.3); color: var(--accent); }
+  .group-chip:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+  .group-chip-del { opacity: 0; font-size: 13px; margin-left: 4px; line-height: 1; }
+  .group-chip:hover .group-chip-del { opacity: 0.5; }
+  .group-chip-del:hover { opacity: 1 !important; }
+
+  /* ── Scene info strip ── */
+  .scene-strip { padding: 7px 24px; border-bottom: 1px solid rgba(255,255,255,0.03); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: rgba(255,255,255,0.01); overflow-x: auto; }
+  .scene-valley { font-size: 10px; font-family: var(--mono); color: var(--dim); white-space: nowrap; }
+  .peak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-family: var(--mono); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 3px; padding: 2px 7px; white-space: nowrap; color: var(--dim); }
+  .peak-chip .elev { color: rgba(79,163,224,0.7); }
+
+  /* ── Best bet banner ── */
+  .best-bet { margin: 14px 24px 0; padding: 10px 16px; border-radius: 8px; border: 1px solid; font-size: 11px; font-family: var(--mono); display: none; }
+  .best-bet.show { display: flex; align-items: center; gap: 10px; }
+  .best-bet.high  { background: rgba(201,79,79,0.08);  border-color: rgba(201,79,79,0.25);  color: #e08080; }
+  .best-bet.mid   { background: rgba(212,131,74,0.08); border-color: rgba(212,131,74,0.25); color: #d4946a; }
+  .best-bet.low   { background: rgba(196,170,74,0.08); border-color: rgba(196,170,74,0.2);  color: #c4aa4a; }
+  .best-bet-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── Forecast row ── */
+  .forecast-row { padding: 14px 24px 20px; display: flex; gap: 14px; overflow-x: auto; align-items: start; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+  .forecast-row::-webkit-scrollbar { height: 4px; }
+
+  /* ── Day card ── */
+  .day-card { flex: 0 0 272px; background: var(--card); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; scroll-snap-align: start; cursor: pointer; transition: border-color 0.2s, transform 0.15s; }
+  .day-card:hover { border-color: rgba(255,255,255,0.12); }
+  .day-card.score-high  { border-color: rgba(201,79,79,0.35); }
+  .day-card.score-vhigh { border-color: rgba(201,79,79,0.5); box-shadow: 0 0 20px rgba(201,79,79,0.1); }
+  .day-card.expanded    { border-color: rgba(79,163,224,0.4); }
+
+  .card-head { padding: 11px 13px 9px; border-bottom: 1px solid var(--border); }
+  .card-date { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; justify-content: space-between; }
+  .card-today { font-size: 9px; font-family: var(--mono); background: rgba(79,163,224,0.15); color: var(--accent); padding: 1px 6px; border-radius: 3px; letter-spacing: 0.05em; }
+  .card-astro { font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.25); margin-top: 4px; line-height: 1.6; }
+
+  /* Score */
+  .score-block { padding: 14px 13px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .score-num { font-size: 52px; font-weight: 700; font-family: var(--mono); line-height: 1; letter-spacing: -0.05em; flex-shrink: 0; }
+  .score-right { flex: 1; }
+  .score-label { font-size: 11px; font-family: var(--mono); letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+  .score-layer { font-size: 10px; font-family: var(--mono); color: var(--dim); margin-top: 4px; line-height: 1.5; }
+  .score-bar-track { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .score-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+  /* Peaks */
+  .peaks-block { padding: 9px 13px; border-bottom: 1px solid var(--border); }
+  .peak-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .peak-row-name { font-size: 11px; font-family: var(--mono); color: var(--dim); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .peak-row-elev { font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.18); width: 58px; text-align: right; flex-shrink: 0; }
+  .peak-row-status { font-size: 10px; font-family: var(--mono); font-weight: 600; width: 64px; text-align: right; flex-shrink: 0; }
+  .peak-row-status.above { color: var(--above); }
+  .peak-row-status.edge  { color: var(--edge); }
+  .peak-row-status.below { color: var(--below); }
+
+  /* Conditions metrics */
+  .cond-block { padding: 8px 13px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+  .cond-item { text-align: center; }
+  .cond-val   { font-size: 13px; font-family: var(--mono); font-weight: 600; }
+  .cond-label { font-size: 8px; font-family: var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+  .good  { color: var(--above); }
+  .ok    { color: var(--edge); }
+  .poor  { color: var(--dim); }
+
+  /* Sub-score breakdown bar */
+  .subscore-block { padding: 6px 13px 10px; border-top: 1px solid rgba(255,255,255,0.03); display: flex; gap: 3px; align-items: flex-end; height: 28px; }
+  .subscore-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
+
+  /* Hourly detail */
+  .hourly-expand { border-top: 1px solid rgba(79,163,224,0.15); }
+  .hourly-expand-head { display: grid; grid-template-columns: 56px 46px 52px 62px 42px 50px; padding: 5px 13px 3px; font-size: 8px; font-family: var(--mono); color: rgba(255,255,255,0.18); text-transform: uppercase; letter-spacing: 0.05em; }
+  .h-row { display: grid; grid-template-columns: 56px 46px 52px 62px 42px 50px; padding: 4px 13px; font-size: 10px; font-family: var(--mono); border-left: 2px solid transparent; }
+  .h-row.is-sunrise { border-left-color: #c4aa4a; background: rgba(196,170,74,0.04); }
+  .h-row.is-golden  { background: rgba(196,170,74,0.02); }
+  .inv-badge { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 8px; letter-spacing: 0.04em; }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+  .modal { background: #161e28; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 22px; width: 100%; max-width: 460px; max-height: 85vh; overflow-y: auto; }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
+  .modal-section { margin-bottom: 14px; }
+  .modal label { display: block; font-size: 10px; font-family: var(--mono); color: var(--dim); margin-bottom: 3px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .modal input { width: 100%; padding: 8px 11px; font-size: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text); border-radius: 6px; outline: none; font-family: var(--mono); }
+  .modal input:focus { border-color: rgba(79,163,224,0.4); }
+  .modal-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .modal-grid2 { display: grid; grid-template-columns: 1fr 90px 26px; gap: 6px; margin-bottom: 6px; align-items: end; }
+  .modal-grid2 input { margin-bottom: 0; }
+  .del-btn { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--dim); border-radius: 5px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; height: 33px; }
+  .del-btn:hover { color: #e06c75; border-color: rgba(224,108,117,0.3); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .btn-save { background: var(--accent); color: #0a0e14; font-weight: 700; padding: 8px 20px; border-radius: 6px; border: none; cursor: pointer; font-family: var(--mono); font-size: 12px; flex: 1; }
+  .btn-save:hover { filter: brightness(1.1); }
+
+  /* Empty / loading */
+  .state-msg { padding: 60px 24px; text-align: center; color: var(--dim); font-size: 13px; font-family: var(--mono); }
+  @keyframes pulse { 0%,100%{opacity:0.35}50%{opacity:1} }
+  .loading { animation: pulse 1.6s ease infinite; }
+
+  /* Footer */
+  .footer { padding: 14px 24px 20px; border-top: 1px solid rgba(255,255,255,0.03); font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.14); line-height: 1.8; }
+  .footer a { color: rgba(79,163,224,0.5); text-decoration: none; }
+
+  @media (max-width: 600px) {
+    .header { padding: 12px 16px 10px; }
+    .header h1 { font-size: 18px; }
+    .group-bar, .scene-strip { padding-left: 16px; padding-right: 16px; }
+    .best-bet { margin-left: 16px; margin-right: 16px; }
+    .forecast-row { padding: 12px 16px 16px; }
+    .day-card { flex: 0 0 calc(100vw - 48px); }
+    .footer { padding: 12px 16px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1><span class="icon">🌫️</span> Inversion Forecast</h1>
+    <p class="sub">Valley cloud inversion predictor for ridge photographers · Open-Meteo · No API key needed</p>
+  </div>
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-ghost" onclick="showAddModal()">+ Group</button>
+    <button class="btn btn-accent" onclick="refreshAll()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="group-bar" id="groupBar"></div>
+<div class="scene-strip" id="sceneStrip"></div>
+<div class="best-bet" id="bestBet"></div>
+<div id="forecast"><div class="state-msg loading">Fetching forecast…</div></div>
+<div class="footer">
+  Inversion score (0–100) = thermal inversion strength (T_surface vs T_850hPa, 40 pts) + overnight calm wind (25 pts) + clear overnight sky / radiative cooling (20 pts) + surface saturation / dewpoint spread (15 pts) ·
+  Cloud layer top = valley elevation + LCL: 410 × (T – Td)°C ft above ground ·
+  "Above clouds" = estimated layer top is below peak elevation ·
+  Best window: ~30–90 min around sunrise as inversion peaks then lifts ·
+  Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo ECMWF IFS</a>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────────
+const GROUPS_KEY = "inversion-groups-v2";
+
+const DEFAULT_GROUPS = [{
+  id: "boulder-foothills",
+  name: "Boulder Foothills",
+  valley: { name: "Boulder, CO", lat: 39.9850, lon: -105.2705, elevFt: 5328 },
+  peaks: [
+    { name: "Mt Sanitas",        elevFt: 6863 },
+    { name: "Green Mountain",    elevFt: 8144 },
+    { name: "Bear Peak",         elevFt: 8461 },
+    { name: "South Boulder Peak",elevFt: 8549 },
+  ]
+}];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let groups       = [];
+let activeId     = null;
+let forecast     = {};   // id → { days } | { error } | null (loading)
+let expandedDay  = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const C2F  = c  => Math.round(c * 9 / 5 + 32);
+const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+const esc  = s  => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+const fmt  = (t, opts) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true, ...opts });
+const fmtDate = t => new Date(t + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+function moonPhase(dateStr) {
+  const ref = new Date("2000-01-06T18:14:00Z").getTime();
+  const CYC = 29.53059 * 86400000;
+  const age = ((new Date(dateStr + "T12:00:00Z").getTime() - ref) % CYC + CYC) % CYC / 86400000;
+  const pct = Math.round((1 - Math.cos(2 * Math.PI * age / 29.53059)) / 2 * 100);
+  const emojis = ["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"];
+  const idx = age < 1.85 ? 0 : age < 7.38 ? 1 : age < 9.22 ? 2 : age < 14.77 ? 3 :
+              age < 16.61 ? 4 : age < 22.15 ? 5 : age < 23.99 ? 6 : 7;
+  const names = ["New","Waxing Crescent","First Quarter","Waxing Gibbous",
+                 "Full","Waning Gibbous","Last Quarter","Waning Crescent"];
+  return { emoji: emojis[idx], pct, name: names[idx] };
+}
+
+// ─── Storage ──────────────────────────────────────────────────────────────────
+function loadGroups() {
+  try { const r = localStorage.getItem(GROUPS_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveGroups() {
+  try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)); } catch {}
+}
+function allGroups() { return groups.length ? groups : DEFAULT_GROUPS; }
+
+// ─── Open-Meteo fetch ─────────────────────────────────────────────────────────
+async function fetchOMData(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&hourly=temperature_2m,dewpoint_2m,windspeed_10m,cloudcover,temperature_850hPa,geopotential_height_850hPa` +
+    `&daily=sunrise,sunset,weathercode,precipitation_probability_max` +
+    `&temperature_unit=celsius&wind_speed_unit=mph&forecast_days=7&timezone=auto`;
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 14000));
+  const r = await Promise.race([fetch(url), timeout]);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ─── Inversion processing ─────────────────────────────────────────────────────
+function processDay(raw, di, group) {
+  const h = raw.hourly;
+  const d = raw.daily;
+  const times = h.time;
+
+  const date       = d.time[di];
+  const sunriseStr = d.sunrise[di];
+  const sunsetStr  = d.sunset[di];
+  const srMs       = sunriseStr ? new Date(sunriseStr).getTime() : null;
+  const ssMs       = sunsetStr  ? new Date(sunsetStr).getTime()  : null;
+
+  // Scoring window: midnight → sunrise (overnight radiative cooling)
+  const scoreStart = new Date(date + "T00:00").getTime();
+  const scoreEnd   = srMs ?? new Date(date + "T07:00").getTime();
+
+  // Display window: 1am → sunrise + 2h (what photographer sees)
+  const dispStart = new Date(date + "T01:00").getTime();
+  const dispEnd   = srMs ? srMs + 7200000 : new Date(date + "T09:00").getTime();
+
+  const scoreIdxs = [], dispIdxs = [];
+  times.forEach((t, i) => {
+    const ms = new Date(t).getTime();
+    if (ms >= scoreStart && ms < scoreEnd) scoreIdxs.push(i);
+    if (ms >= dispStart  && ms <= dispEnd) dispIdxs.push(i);
+  });
+
+  // Fallback if no overnight hours found
+  const workIdxs = scoreIdxs.length > 0 ? scoreIdxs : dispIdxs;
+  if (workIdxs.length === 0) {
+    return { date, sunriseStr, sunsetStr, score: 0, label: "No Data", color: "var(--dim)",
+             layerTopFt: null, peakStatus: [], hourlyDetail: [], moon: moonPhase(date) };
+  }
+
+  const get = key => workIdxs.map(i => h[key][i] ?? 0);
+  const avgT2m   = mean(get("temperature_2m"));
+  const avgTd    = mean(get("dewpoint_2m"));
+  const avgWind  = mean(get("windspeed_10m"));
+  const avgCloud = mean(get("cloudcover"));
+  const avgT850  = mean(get("temperature_850hPa"));
+
+  // ── Scoring ──────────────────────────────────────────────────────────────
+  const invDelta     = avgT850 - avgT2m;                           // +ve = inverted
+  const thermalScore = Math.round(Math.min(40, Math.max(0, invDelta * 6)));
+  const windScore    = avgWind < 4 ? 25 : avgWind < 8 ? 17 : avgWind < 13 ? 7 : 0;
+  const cloudScore   = avgCloud < 15 ? 20 : avgCloud < 35 ? 12 : avgCloud < 55 ? 5 : 0;
+  const tdSpread     = avgT2m - avgTd;                             // °C, smaller = more saturated
+  const dpScore      = tdSpread < 2 ? 15 : tdSpread < 4 ? 10 : tdSpread < 7 ? 5 : 0;
+  const score        = thermalScore + windScore + cloudScore + dpScore;
+
+  // ── Layer top (LCL) ──────────────────────────────────────────────────────
+  // Use minimum spread during scoring window for best-case cloud base
+  const minSpread = Math.min(...workIdxs.map(i => Math.max(0, (h.temperature_2m[i] ?? 0) - (h.dewpoint_2m[i] ?? 0))));
+  const lclFt     = minSpread * 125 * 3.28084;    // LCL(m) = 125*(T-Td)°C → ft
+  const layerTopFt = Math.round(group.valley.elevFt + lclFt);
+
+  // ── Labels ───────────────────────────────────────────────────────────────
+  let label, color;
+  if      (score < 20) { label = "Unlikely";  color = "var(--score-none)"; }
+  else if (score < 40) { label = "Low";       color = "var(--score-low)";  }
+  else if (score < 58) { label = "Possible";  color = "var(--score-mid)";  }
+  else if (score < 74) { label = "Likely";    color = "var(--score-high)"; }
+  else                 { label = "Strong";    color = "var(--score-vhigh)";}
+
+  // ── Peak status ──────────────────────────────────────────────────────────
+  const peakStatus = group.peaks.map(p => {
+    const diff = p.elevFt - layerTopFt;
+    if (diff >  400) return { status: "above", diff };
+    if (diff > -400) return { status: "edge",  diff };
+    return                  { status: "below", diff };
+  });
+
+  // ── Hourly detail ─────────────────────────────────────────────────────────
+  const hourlyDetail = dispIdxs.map(i => {
+    const tMs    = new Date(times[i]).getTime();
+    const t2     = h.temperature_2m[i] ?? 0;
+    const td2    = h.dewpoint_2m[i] ?? 0;
+    const t850   = h.temperature_850hPa[i] ?? 0;
+    const spread = Math.max(0, t2 - td2);
+    const lFt    = Math.round(group.valley.elevFt + spread * 125 * 3.28084);
+    return {
+      ms:        tMs,
+      t2f:       C2F(t2),
+      t850f:     C2F(t850),
+      invDeltaC: +(t850 - t2).toFixed(1),
+      wind:      Math.round(h.windspeed_10m[i] ?? 0),
+      cloud:     Math.round(h.cloudcover[i]    ?? 0),
+      layerFt:   lFt,
+      isSunrise: srMs != null && Math.abs(tMs - srMs) < 1800000,
+      isGolden:  srMs != null && tMs >= srMs - 1800000 && tMs <= srMs + 5400000,
+      peaksAbove: group.peaks.filter(p => p.elevFt > lFt).length,
+    };
+  });
+
+  const moon = moonPhase(date);
+  const precipChance = d.precipitation_probability_max?.[di] ?? 0;
+
+  return {
+    date, sunriseStr, sunsetStr, score, label, color,
+    layerTopFt, invDelta: +invDelta.toFixed(1), invConfirmed: invDelta > 0,
+    avgWind: Math.round(avgWind), avgCloud: Math.round(avgCloud),
+    tdSpreadF: Math.round(tdSpread * 9 / 5),
+    thermalScore, windScore, cloudScore, dpScore,
+    peakStatus, hourlyDetail, moon, precipChance,
+  };
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  renderGroupBar();
+  renderSceneStrip();
+  renderBestBet();
+  renderForecast();
+}
+
+function renderGroupBar() {
+  const bar = document.getElementById("groupBar");
+  const gs  = allGroups();
+  if (!activeId) activeId = gs[0]?.id;
+  bar.innerHTML = gs.map(g => {
+    const isDefault = g.id === "boulder-foothills";
+    const del = !isDefault ? `<span class="group-chip-del" onclick="event.stopPropagation();deleteGroup('${g.id}')">×</span>` : "";
+    return `<button class="group-chip${g.id === activeId ? " active" : ""}" onclick="selectGroup('${g.id}')">${esc(g.name)}${del}</button>`;
+  }).join("") +
+  `<button class="btn btn-ghost" style="margin-left:auto;font-size:10px" onclick="showAddModal()">+ Add Group</button>`;
+}
+
+function renderSceneStrip() {
+  const strip = document.getElementById("sceneStrip");
+  const g = allGroups().find(x => x.id === activeId);
+  if (!g) { strip.innerHTML = ""; return; }
+  const chips = g.peaks.map(p =>
+    `<span class="peak-chip">▲ ${esc(p.name)} <span class="elev">${p.elevFt.toLocaleString()} ft</span></span>`
+  ).join("");
+  strip.innerHTML = `<span class="scene-valley">📍 ${esc(g.valley.name)} · ${g.valley.elevFt.toLocaleString()} ft</span>${chips}`;
+}
+
+function renderBestBet() {
+  const bb = document.getElementById("bestBet");
+  const fd = forecast[activeId];
+  if (!fd?.days) { bb.className = "best-bet"; return; }
+  const best = [...fd.days].filter(d => d.score >= 40).sort((a, b) => b.score - a.score)[0];
+  if (!best) { bb.className = "best-bet"; return; }
+  const tier = best.score >= 70 ? "high" : best.score >= 55 ? "mid" : "low";
+  const dt   = fmtDate(best.date);
+  const sr   = best.sunriseStr ? fmt(best.sunriseStr) : "—";
+  const peaksUp = allGroups().find(x => x.id === activeId)?.peaks
+    .filter((p, i) => best.peakStatus[i]?.status === "above").map(p => p.name.split(" ")[0]).join(", ");
+  const layerStr = best.layerTopFt ? `layer ~${best.layerTopFt.toLocaleString()} ft` : "";
+  const peaksStr = peaksUp ? ` · ${peaksUp} above clouds` : "";
+  bb.className = `best-bet show ${tier}`;
+  bb.innerHTML = `<span class="best-bet-icon">🎯</span>
+    <span><strong>Best window: ${dt}</strong> · Score ${best.score} (${best.label}) · ${sr} sunrise · ${layerStr}${peaksStr}</span>`;
+}
+
+function renderForecast() {
+  const el = document.getElementById("forecast");
+  const g  = allGroups().find(x => x.id === activeId);
+  if (!g) { el.innerHTML = `<div class="state-msg">No group selected</div>`; return; }
+  const fd = forecast[activeId];
+  if (!fd)       { el.innerHTML = `<div class="state-msg loading">Fetching forecast for ${esc(g.valley.name)}…</div>`; return; }
+  if (fd.error)  { el.innerHTML = `<div class="state-msg">Error: ${esc(fd.error)}<br><br><button class="btn btn-ghost" onclick="refreshAll()" style="margin-top:8px">↻ Retry</button></div>`; return; }
+  el.innerHTML = `<div class="forecast-row">${fd.days.map((day, i) => renderCard(day, i, g)).join("")}</div>`;
+}
+
+function renderCard(day, i, group) {
+  const today     = new Date().toDateString() === new Date(day.date + "T12:00:00").toDateString();
+  const tomorrow  = new Date(Date.now() + 86400000).toDateString() === new Date(day.date + "T12:00:00").toDateString();
+  const isExp     = expandedDay === i;
+  const tierCls   = day.score >= 74 ? "score-vhigh" : day.score >= 58 ? "score-high" : "";
+  const cardCls   = `day-card ${tierCls}${isExp ? " expanded" : ""}`;
+  const tagHtml   = today ? `<span class="card-today">TODAY</span>` : tomorrow ? `<span class="card-today" style="background:rgba(90,172,110,0.15);color:var(--above)">TOMORROW</span>` : "";
+
+  const srStr = day.sunriseStr ? fmt(day.sunriseStr) : "—";
+  const ssStr = day.sunsetStr  ? fmt(day.sunsetStr)  : "—";
+  const precipStr = day.precipChance > 30 ? ` · 🌧 ${day.precipChance}%` : "";
+
+  const layerStr = day.layerTopFt ? `~${day.layerTopFt.toLocaleString()} ft` : "—";
+  const invStr   = day.invConfirmed
+    ? `<span style="color:var(--score-high)">+${day.invDelta}°C inversion confirmed</span>`
+    : `<span style="color:var(--dim)">no inversion at 850mb</span>`;
+
+  // Peaks
+  const peakRows = group.peaks.map((p, pi) => {
+    const ps   = day.peakStatus[pi];
+    const diff = ps?.diff ?? 0;
+    const sc   = ps?.status === "above" ? "above" : ps?.status === "edge" ? "edge" : "below";
+    const lbl  = ps?.status === "above" ? `↑ +${Math.abs(diff).toLocaleString()} ft`
+               : ps?.status === "edge"  ? `~ ±${Math.abs(diff).toLocaleString()} ft`
+               :                          `↓ ${Math.abs(diff).toLocaleString()} ft`;
+    return `<div class="peak-row">
+      <span class="peak-row-name">${esc(p.name)}</span>
+      <span class="peak-row-elev">${p.elevFt.toLocaleString()} ft</span>
+      <span class="peak-row-status ${sc}">${lbl}</span>
+    </div>`;
+  }).join("");
+
+  // Conditions
+  const wColor = day.avgWind  <= 5  ? "good" : day.avgWind  <= 11 ? "ok" : "poor";
+  const cColor = day.avgCloud <= 20 ? "good" : day.avgCloud <= 45 ? "ok" : "poor";
+  const dColor = day.tdSpreadF <= 5 ? "good" : day.tdSpreadF <= 9 ? "ok" : "poor";
+  const iColor = day.invConfirmed   ? "good" : "poor";
+
+  // Sub-score bars
+  const barH = (v, max) => Math.max(2, Math.round((v / max) * 28));
+  const barColor = (v, max) => {
+    const pct = v / max;
+    return pct > 0.65 ? "var(--above)" : pct > 0.35 ? "var(--edge)" : "var(--dim)";
+  };
+  const bars = [
+    { v: day.thermalScore, max: 40, label: "Therm" },
+    { v: day.windScore,    max: 25, label: "Wind"  },
+    { v: day.cloudScore,   max: 20, label: "Sky"   },
+    { v: day.dpScore,      max: 15, label: "Satur" },
+  ].map(b => `<div class="subscore-bar" style="height:${barH(b.v,b.max)}px;background:${barColor(b.v,b.max)};flex:1" title="${b.label}: ${b.v}/${b.max}"></div>`).join("");
+
+  // Hourly detail
+  const hourlyHtml = isExp ? renderHourly(day, group) : "";
+
+  return `<div class="${cardCls}" onclick="toggleDay(${i})">
+    <div class="card-head">
+      <div class="card-date">${fmtDate(day.date)} ${tagHtml}</div>
+      <div class="card-astro">🌅 ${srStr} &nbsp; 🌇 ${ssStr} &nbsp; ${day.moon.emoji} ${day.moon.pct}%&nbsp;<span style="color:rgba(255,255,255,0.15)" title="${day.moon.name}">${day.moon.name}</span>${precipStr}</div>
+    </div>
+    <div class="score-block">
+      <div class="score-num" style="color:${day.color}">${day.score}</div>
+      <div class="score-right">
+        <div class="score-label" style="color:${day.color}">${day.label}</div>
+        <div class="score-layer">Layer: ${layerStr}<br>${invStr}</div>
+        <div class="score-bar-track"><div class="score-bar-fill" style="width:${day.score}%;background:${day.color}"></div></div>
+      </div>
+    </div>
+    <div class="peaks-block">${peakRows}</div>
+    <div class="cond-block">
+      <div class="cond-item"><div class="cond-val ${wColor}">${day.avgWind}</div><div class="cond-label">Wind mph</div></div>
+      <div class="cond-item"><div class="cond-val ${cColor}">${day.avgCloud}%</div><div class="cond-label">Overnight ☁</div></div>
+      <div class="cond-item"><div class="cond-val ${dColor}">${day.tdSpreadF}°</div><div class="cond-label">T–Td °F</div></div>
+      <div class="cond-item"><div class="cond-val ${iColor}">${day.invConfirmed ? "✓" : "✗"}</div><div class="cond-label">850mb Inv</div></div>
+    </div>
+    <div class="subscore-block" title="Sub-scores: Thermal · Wind · Sky · Saturation">${bars}</div>
+    ${hourlyHtml}
+  </div>`;
+}
+
+function renderHourly(day, group) {
+  if (!day.hourlyDetail.length) return "";
+  const srMs = day.sunriseStr ? new Date(day.sunriseStr).getTime() : null;
+  const maxDelta = Math.max(1, ...day.hourlyDetail.map(h => Math.max(0, h.invDeltaC)));
+
+  const rows = day.hourlyDetail.map(h => {
+    const timeStr = new Date(h.ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+    const rowCls  = h.isSunrise ? "h-row is-sunrise" : h.isGolden ? "h-row is-golden" : "h-row";
+    const invPct  = Math.round(Math.max(0, h.invDeltaC) / maxDelta * 100);
+    const invColor = invPct > 65 ? "var(--score-high)" : invPct > 30 ? "var(--score-mid)" : "var(--dim)";
+    const invBadge = h.invDeltaC > 0
+      ? `<span class="inv-badge" style="background:${invColor}22;color:${invColor}">+${h.invDeltaC}°</span>`
+      : `<span style="color:var(--dim);font-size:9px">—</span>`;
+    const peakStr  = h.peaksAbove > 0
+      ? `<span style="color:var(--above)">${h.peaksAbove}/${group.peaks.length} ↑</span>`
+      : `<span style="color:var(--dim)">0/${group.peaks.length}</span>`;
+    const isSrMark = h.isSunrise ? `<span style="color:#c4aa4a;font-size:9px"> ☀</span>` : "";
+
+    return `<div class="${rowCls}">
+      <span style="color:var(--dim)">${timeStr}${isSrMark}</span>
+      <span>${h.t2f}°F</span>
+      <span style="color:var(--dim)">${h.t850f}°</span>
+      ${invBadge}
+      <span style="color:${h.wind <= 8 ? "var(--above)" : "var(--dim)"}">${h.wind}</span>
+      ${peakStr}
+    </div>`;
+  }).join("");
+
+  return `<div class="hourly-expand" onclick="event.stopPropagation()">
+    <div class="hourly-expand-head">
+      <span>Time</span><span>Surf</span><span>850mb</span><span>ΔInv</span><span>Wind</span><span>Peaks↑</span>
+    </div>
+    ${rows}
+    <div style="font-size:8px;font-family:var(--mono);color:rgba(196,170,74,0.45);padding:3px 13px 8px">☀ = sunrise row · ΔInv = 850mb minus surface (°C, positive = inverted)</div>
+  </div>`;
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+function toggleDay(i) { expandedDay = expandedDay === i ? null : i; renderForecast(); }
+
+function selectGroup(id) {
+  activeId = id; expandedDay = null; render();
+  if (!forecast[id]) fetchGroup(id);
+}
+
+function deleteGroup(id) {
+  groups = allGroups().filter(g => g.id !== id);
+  saveGroups();
+  delete forecast[id];
+  if (activeId === id) activeId = allGroups()[0]?.id;
+  render();
+  if (activeId && !forecast[activeId]) fetchGroup(activeId);
+}
+
+async function fetchGroup(id) {
+  const g = allGroups().find(x => x.id === id);
+  if (!g) return;
+  forecast[id] = null;
+  renderForecast();
+  try {
+    const raw  = await fetchOMData(g.valley.lat, g.valley.lon);
+    const days = raw.daily.time.map((_, di) => processDay(raw, di, g));
+    forecast[id] = { days };
+  } catch (e) {
+    forecast[id] = { error: e.message || "Unknown error" };
+  }
+  if (id === activeId) { renderBestBet(); renderForecast(); }
+}
+
+function refreshAll() { forecast = {}; expandedDay = null; fetchGroup(activeId); }
+
+// ─── Add Group Modal ──────────────────────────────────────────────────────────
+function showAddModal() {
+  const ov = document.createElement("div");
+  ov.className = "overlay";
+  ov.id = "addOverlay";
+  ov.onclick = closeModal;
+  ov.innerHTML = `<div class="modal" onclick="event.stopPropagation()">
+    <h2>Add Location Group</h2>
+    <div class="modal-section">
+      <label>Group Name</label>
+      <input id="m-name" placeholder="e.g. Wasatch Front, UT" />
+    </div>
+    <div class="modal-section">
+      <label>Valley / Reference Point (where cold air pools)</label>
+      <input id="m-vname" placeholder="e.g. Salt Lake City, UT" style="margin-bottom:8px" />
+      <div class="modal-grid3">
+        <div><label>Latitude</label><input id="m-lat" placeholder="40.76" /></div>
+        <div><label>Longitude</label><input id="m-lon" placeholder="-111.89" /></div>
+        <div><label>Elevation (ft)</label><input id="m-elev" placeholder="4226" /></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <label>Peaks to watch (name + elevation ft)</label>
+      <div id="m-peaks">
+        <div class="modal-grid2">
+          <input placeholder="Peak name" class="pn" />
+          <input placeholder="Elev ft" class="pe" type="number" />
+          <button class="del-btn" onclick="this.closest('.modal-grid2').remove()">×</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" onclick="addPeak()" style="margin-top:6px;width:100%;font-size:10px">+ Add Peak</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-save" onclick="saveGroup()">Save Group</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+function addPeak() {
+  const row = document.createElement("div");
+  row.className = "modal-grid2";
+  row.innerHTML = `<input placeholder="Peak name" class="pn" /><input placeholder="Elev ft" class="pe" type="number" /><button class="del-btn" onclick="this.closest('.modal-grid2').remove()">×</button>`;
+  document.getElementById("m-peaks").appendChild(row);
+}
+
+function closeModal() { document.getElementById("addOverlay")?.remove(); }
+
+function saveGroup() {
+  const name  = document.getElementById("m-name").value.trim();
+  const vname = document.getElementById("m-vname").value.trim();
+  const lat   = parseFloat(document.getElementById("m-lat").value);
+  const lon   = parseFloat(document.getElementById("m-lon").value);
+  const elev  = parseInt(document.getElementById("m-elev").value);
+
+  if (!name || isNaN(lat) || isNaN(lon) || isNaN(elev)) {
+    alert("Please fill in: group name, latitude, longitude, and valley elevation."); return;
+  }
+  const peaks = [...document.querySelectorAll("#m-peaks .modal-grid2")].reduce((acc, row) => {
+    const n = row.querySelector(".pn").value.trim();
+    const e = parseInt(row.querySelector(".pe").value);
+    if (n && !isNaN(e)) acc.push({ name: n, elevFt: e });
+    return acc;
+  }, []);
+  if (!peaks.length) { alert("Add at least one peak."); return; }
+
+  const g = { id: "g-" + Date.now(), name, valley: { name: vname || name, lat, lon, elevFt: elev }, peaks };
+  groups = [...allGroups(), g];
+  saveGroups();
+  closeModal();
+  selectGroup(g.id);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+groups   = loadGroups() ?? [...DEFAULT_GROUPS];
+activeId = allGroups()[0].id;
+render();
+setTimeout(() => fetchGroup(activeId), 0);
+</script>
+</body>
+</html>
